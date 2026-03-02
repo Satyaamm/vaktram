@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* Deep Ocean Light Theme */
+    --background: 210 40% 98%;       /* slate-50 #F8FAFC */
+    --foreground: 222 47% 11%;       /* slate-800 #1E293B */
+    --card: 0 0% 100%;               /* white */
+    --card-foreground: 222 47% 11%;  /* slate-800 */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 175 77% 26%;          /* teal-700 #0F766E */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 166 76% 47%;        /* teal-500 #14B8A6 */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96%;            /* slate-100 #F1F5F9 */
+    --muted-foreground: 215 16% 47%; /* slate-500 #64748B */
+    --accent: 38 92% 50%;            /* amber-500 #F59E0B */
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;        /* red-500 #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;           /* slate-200 #E2E8F0 */
+    --input: 214 32% 91%;
+    --ring: 175 77% 26%;             /* teal-700 */
+    --radius: 0.5rem;
+
+    /* Charts — teal/amber based */
+    --chart-1: 175 77% 26%;
+    --chart-2: 166 76% 47%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 142 71% 45%;
+    --chart-5: 217 91% 60%;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 175 77% 26%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 166 84% 93%;   /* teal-100 #CCFBF1 */
+    --sidebar-accent-foreground: 175 82% 20%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 175 77% 26%;
+  }
+
+  .dark {
+    /* Deep Ocean Dark Theme */
+    --background: 222 47% 11%;       /* slate-900 #0F172A */
+    --foreground: 210 40% 96%;       /* slate-100 #F1F5F9 */
+    --card: 217 33% 17%;             /* slate-800 #1E293B */
+    --card-foreground: 210 40% 96%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 166 76% 47%;          /* teal-500 #14B8A6 */
+    --primary-foreground: 222 47% 11%;
+    --secondary: 175 77% 26%;        /* teal-700 #0F766E */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217 19% 27%;            /* slate-700 #334155 */
+    --muted-foreground: 215 20% 65%; /* slate-400 #94A3B8 */
+    --accent: 38 92% 50%;            /* amber-500 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 19% 27%;           /* slate-700 #334155 */
+    --input: 217 19% 27%;
+    --ring: 166 76% 47%;
+
+    --chart-1: 166 76% 47%;
+    --chart-2: 175 77% 26%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 142 71% 45%;
+    --chart-5: 217 91% 60%;
+
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 166 76% 47%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 217 19% 27%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 19% 27%;
+    --sidebar-ring: 166 76% 47%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

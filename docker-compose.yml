@@ -1,0 +1,121 @@
+version: "3.8"
+
+services:
+  # ============================================
+  # Next.js Frontend
+  # ============================================
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - API_URL=http://api:8000
+    volumes:
+      - ./apps/web/src:/app/apps/web/src
+    depends_on:
+      - api
+
+  # ============================================
+  # FastAPI Backend
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${SUPABASE_DB_URL}
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
+      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
+      - UPSTASH_REDIS_TOKEN=${UPSTASH_REDIS_TOKEN}
+      - QSTASH_TOKEN=${QSTASH_TOKEN}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - DEFAULT_LLM_MODEL=${DEFAULT_LLM_MODEL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - ENVIRONMENT=development
+      - BOT_SERVICE_URL=http://bot:8001
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
+    volumes:
+      - ./apps/api:/app/apps/api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # Meeting Bot Service
+  # ============================================
+  bot:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.bot
+    ports:
+      - "8001:8001"
+    environment:
+      - API_URL=http://api:8000
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    volumes:
+      - ./apps/bot-service:/app/apps/bot-service
+    # Needs PulseAudio for audio capture
+    privileged: true
+
+  # ============================================
+  # Transcription Worker
+  # ============================================
+  transcription-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.transcription
+    environment:
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - HF_TOKEN=${HF_TOKEN}
+      - API_URL=http://api:8000
+    volumes:
+      - ./apps/workers/transcription:/app/apps/workers/transcription
+      - model-cache:/root/.cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ============================================
+  # Summarization Worker
+  # ============================================
+  summarization-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.summarizer
+    environment:
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - DEFAULT_LLM_MODEL=${DEFAULT_LLM_MODEL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - API_URL=http://api:8000
+    volumes:
+      - ./apps/workers/summarizer:/app/apps/workers/summarizer
+      - model-cache:/root/.cache
+
+volumes:
+  model-cache:

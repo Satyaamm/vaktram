@@ -1,0 +1,36 @@
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY apps/workers/transcription/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy shared packages
+COPY packages/ packages/
+
+# Copy worker code
+COPY apps/workers/transcription/ .
+
+# Pre-download models directory (models downloaded at runtime or via init script)
+RUN mkdir -p /app/models
+
+ENV WHISPER_MODEL=large-v3
+ENV COMPUTE_DEVICE=auto
+ENV POLL_INTERVAL_SECONDS=5
+ENV LOG_LEVEL=INFO
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "print('healthy')" || exit 1
+
+CMD ["python", "worker.py"]
