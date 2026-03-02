@@ -48,10 +48,25 @@ async def get_current_user(
     )
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User profile not found",
+        # Auto-create user profile on first API call
+        email = payload.get("email")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found and no email in token",
+            )
+        user_meta = payload.get("user_metadata", {})
+        user = UserProfile(
+            id=user_uuid,
+            email=email,
+            full_name=user_meta.get("full_name") or user_meta.get("name"),
+            role="member",
+            is_active=True,
+            onboarding_completed=False,
         )
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -13,6 +13,34 @@ export async function GET(request: Request) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (!error) {
+        // Auto-create user profile if it doesn't exist
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data: existingProfile } = await supabase
+            .from("user_profiles")
+            .select("id")
+            .eq("id", user.id)
+            .single();
+
+          if (!existingProfile) {
+            await supabase.from("user_profiles").insert({
+              id: user.id,
+              email: user.email,
+              full_name:
+                user.user_metadata?.full_name ||
+                user.user_metadata?.name ||
+                null,
+              avatar_url: user.user_metadata?.avatar_url || null,
+              role: "member",
+              is_active: true,
+              onboarding_completed: false,
+            });
+          }
+        }
+
         return NextResponse.redirect(`${origin}${next}`);
       }
 

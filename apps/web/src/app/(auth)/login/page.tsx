@@ -236,6 +236,15 @@ export default function LoginPage() {
           )}
           Send Magic Link
         </Button>
+
+        <div className="text-center">
+          <Link
+            href="/forgot-password"
+            className="text-sm text-muted-foreground hover:text-teal-700 transition-colors"
+          >
+            Forgot your password?
+          </Link>
+        </div>
       </CardContent>
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">

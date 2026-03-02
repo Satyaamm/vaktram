@@ -146,7 +146,7 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.h1
-            className="text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl"
+            className="text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl md:text-7xl lg:text-8xl"
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
@@ -254,7 +254,7 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.5 }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
               Everything you need for
               <br />
               <span className="text-teal-700">meeting intelligence</span>
@@ -283,7 +283,7 @@ export default function LandingPage() {
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 group-hover:bg-teal-100 transition-colors duration-200">
                   <feature.icon className="h-6 w-6 text-teal-700" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h3>
                 <p className="text-sm text-slate-600 leading-relaxed">
                   {feature.description}
                 </p>
@@ -307,7 +307,7 @@ export default function LandingPage() {
               <Badge className="mb-4 bg-amber-500 text-white hover:bg-amber-500">
                 BYOM
               </Badge>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
                 Your Model,{" "}
                 <span className="text-teal-700">Your Rules</span>
               </h2>
@@ -396,7 +396,7 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.5 }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
               How it works
             </h2>
             <p className="mt-4 text-lg text-slate-600 max-w-xl mx-auto">
@@ -449,7 +449,7 @@ export default function LandingPage() {
             viewport={{ once: true, amount: 0.5 }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
               Simple, transparent pricing
             </h2>
             <p className="mt-4 text-lg text-slate-600">
