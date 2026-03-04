@@ -360,10 +360,10 @@ function MembersTable({ members }: { members: TeamMember[] }) {
                   </TableCell>
                   <TableCell>{roleBadge(member.role)}</TableCell>
                   <TableCell className="text-sm">
-                    {member.meetings_count}
+                    {member.is_active ? "Active" : "Inactive"}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {formatLastActive(member.last_active_at)}
+                    {formatLastActive(member.updated_at)}
                   </TableCell>
                   <TableCell>
                     {member.role !== "owner" && (

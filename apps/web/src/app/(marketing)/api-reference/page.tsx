@@ -151,7 +151,7 @@ export default function ApiReferencePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="bg-gradient-to-b from-slate-900 to-slate-800 text-white py-24 px-4">
+      <section className="bg-gradient-to-b from-blue-950 to-blue-900 text-white py-24 px-4">
         <div className="container mx-auto max-w-4xl text-center">
           <motion.h1
             className="text-4xl md:text-5xl font-bold tracking-tight"

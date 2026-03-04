@@ -64,6 +64,9 @@ class MeetingRead(MeetingBase):
     actual_end: datetime | None = None
     duration_seconds: int | None = None
     bot_id: str | None = None
+    audio_url: str | None = None
+    transcript_ready: bool = False
+    summary_ready: bool = False
     created_at: datetime
     updated_at: datetime
     participants: list[ParticipantRead] = Field(default_factory=list)

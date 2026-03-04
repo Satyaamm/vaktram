@@ -42,6 +42,16 @@ class UserProfileCreate(UserProfileBase):
     organization_id: uuid.UUID | None = None
 
 
+class UserProfileSSOCreate(BaseModel):
+    """Created from SSO provider data (Google, Microsoft, etc.)."""
+
+    provider: str = Field(..., description="SSO provider: google, azure, github")
+    provider_user_id: str | None = Field(None, description="Provider-specific user ID")
+    email: str = Field(..., max_length=255)
+    full_name: str | None = Field(None, max_length=255)
+    avatar_url: str | None = None
+
+
 class UserProfileUpdate(BaseModel):
     full_name: str | None = Field(None, max_length=255)
     avatar_url: str | None = None

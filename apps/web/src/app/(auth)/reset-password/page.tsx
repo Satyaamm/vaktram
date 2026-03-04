@@ -67,21 +67,20 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <Card className="w-full max-w-md">
+      <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-700 text-white">
-            <CheckCircle className="h-6 w-6" />
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <CheckCircle className="h-5 w-5" />
           </div>
-          <CardTitle className="text-2xl">Password updated</CardTitle>
+          <CardTitle className="text-xl font-bold">Password updated</CardTitle>
           <CardDescription className="mt-2">
-            Your password has been reset successfully. Redirecting you to sign
-            in...
+            Your password has been reset. Redirecting you to sign in...
           </CardDescription>
         </CardHeader>
-        <CardFooter className="justify-center">
+        <CardFooter className="justify-center pb-6">
           <Link
             href="/login"
-            className="text-sm font-medium text-teal-700 hover:underline"
+            className="text-sm font-medium text-primary hover:underline underline-offset-2"
           >
             Sign in now
           </Link>
@@ -91,40 +90,42 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-700 text-white font-bold text-xl">
+    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
+      <CardHeader className="text-center pb-4">
+        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-base">
           V
         </div>
-        <CardTitle className="text-2xl">Set new password</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-xl font-bold">Set new password</CardTitle>
+        <CardDescription className="text-sm">
           Enter your new password below.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-6">
         {error && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="password">New password</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className="text-sm">New password</Label>
           <Input
             id="password"
             type="password"
             placeholder="At least 6 characters"
+            className="h-11 rounded-lg"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm new password</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className="text-sm">Confirm password</Label>
           <Input
             id="confirmPassword"
             type="password"
             placeholder="Repeat your password"
+            className="h-11 rounded-lg"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             onKeyDown={(e) => {
@@ -134,8 +135,7 @@ export default function ResetPasswordPage() {
           />
         </div>
         <Button
-          className="w-full bg-teal-700 hover:bg-teal-800 text-white"
-          size="lg"
+          className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
           onClick={handleResetPassword}
           disabled={loading}
         >
@@ -144,10 +144,10 @@ export default function ResetPasswordPage() {
           ) : (
             <Lock className="mr-2 h-4 w-4" />
           )}
-          Reset Password
+          Reset password
         </Button>
       </CardContent>
-      <CardFooter className="justify-center">
+      <CardFooter className="justify-center pb-6">
         <Link
           href="/login"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"

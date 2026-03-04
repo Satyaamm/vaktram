@@ -1,8 +1,9 @@
 import { api } from "./client";
 import type {
   Meeting,
+  MeetingList,
   CreateMeetingInput,
-  TranscriptSegment,
+  FullTranscript,
   MeetingSummary,
   SearchResult,
 } from "@/types";
@@ -11,64 +12,65 @@ export async function getMeetings(params?: {
   status?: string;
   page?: number;
   limit?: number;
-}): Promise<Meeting[]> {
+}): Promise<MeetingList> {
   const searchParams = new URLSearchParams();
   if (params?.status) searchParams.set("status", params.status);
   if (params?.page) searchParams.set("page", String(params.page));
   if (params?.limit) searchParams.set("limit", String(params.limit));
 
   const query = searchParams.toString();
-  return api.get<Meeting[]>(`/api/meetings${query ? `?${query}` : ""}`);
+  return api.get<MeetingList>(`/api/v1/meetings${query ? `?${query}` : ""}`);
 }
 
 export async function getMeeting(id: string): Promise<Meeting> {
-  return api.get<Meeting>(`/api/meetings/${id}`);
+  return api.get<Meeting>(`/api/v1/meetings/${id}`);
 }
 
 export async function createMeeting(
   data: CreateMeetingInput
 ): Promise<Meeting> {
-  return api.post<Meeting>("/api/meetings", data);
+  return api.post<Meeting>("/api/v1/meetings", data);
 }
 
 export async function deleteMeeting(id: string): Promise<void> {
-  return api.delete<void>(`/api/meetings/${id}`);
+  return api.delete<void>(`/api/v1/meetings/${id}`);
 }
 
 export async function getTranscript(
   meetingId: string
-): Promise<TranscriptSegment[]> {
-  return api.get<TranscriptSegment[]>(
-    `/api/meetings/${meetingId}/transcript`
-  );
+): Promise<FullTranscript> {
+  return api.get<FullTranscript>(`/api/v1/transcripts/${meetingId}`);
 }
 
 export async function getSummary(
   meetingId: string
 ): Promise<MeetingSummary> {
-  return api.get<MeetingSummary>(`/api/meetings/${meetingId}/summary`);
+  return api.get<MeetingSummary>(`/api/v1/summaries/${meetingId}`);
 }
 
 export async function startBot(
-  meetingId: string
-): Promise<{ status: string }> {
-  return api.post<{ status: string }>(
-    `/api/meetings/${meetingId}/bot/start`
+  meetingId: string,
+  meetingUrl: string
+): Promise<{ status: string; meeting_id: string }> {
+  return api.post<{ status: string; meeting_id: string }>(
+    "/api/v1/bot/join",
+    { meeting_id: meetingId, meeting_url: meetingUrl }
   );
 }
 
 export async function stopBot(
   meetingId: string
-): Promise<{ status: string }> {
-  return api.post<{ status: string }>(
-    `/api/meetings/${meetingId}/bot/stop`
+): Promise<{ status: string; meeting_id: string }> {
+  return api.post<{ status: string; meeting_id: string }>(
+    `/api/v1/bot/leave/${meetingId}`
   );
 }
 
 export async function searchMeetings(
   query: string
-): Promise<SearchResult[]> {
-  return api.get<SearchResult[]>(
-    `/api/meetings/search?q=${encodeURIComponent(query)}`
+): Promise<{ results: SearchResult[]; total: number }> {
+  return api.post<{ results: SearchResult[]; total: number }>(
+    "/api/v1/search",
+    { query, top_k: 50 }
   );
 }

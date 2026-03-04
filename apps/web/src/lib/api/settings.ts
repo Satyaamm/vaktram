@@ -17,16 +17,24 @@ export async function getAIConfigs(): Promise<UserAIConfig[]> {
 
 export async function createAIConfig(data: {
   provider: string;
-  model: string;
-  api_key: string;
+  model_name: string;
+  api_key?: string;
   base_url?: string;
+  is_default?: boolean;
 }): Promise<UserAIConfig> {
   return api.post<UserAIConfig>("/api/v1/ai-config", data);
 }
 
 export async function updateAIConfig(
   id: string,
-  data: Partial<{ provider: string; model: string; api_key: string; base_url: string; is_default: boolean }>
+  data: Partial<{
+    provider: string;
+    model_name: string;
+    api_key: string;
+    base_url: string;
+    is_default: boolean;
+    is_active: boolean;
+  }>
 ): Promise<UserAIConfig> {
   return api.patch<UserAIConfig>(`/api/v1/ai-config/${id}`, data);
 }
@@ -37,8 +45,8 @@ export async function deleteAIConfig(id: string): Promise<void> {
 
 export async function testAIConfig(data: {
   provider: string;
-  model: string;
-  api_key: string;
+  model_name: string;
+  api_key?: string;
   base_url?: string;
 }): Promise<{ success: boolean; message: string; response_time_ms?: number }> {
   return api.post("/api/v1/ai-config/test", data);
@@ -64,13 +72,9 @@ export async function disconnectCalendar(id: string): Promise<void> {
 // Analytics
 export interface AnalyticsOverview {
   total_meetings: number;
-  total_duration_seconds: number;
-  total_action_items: number;
-  completed_action_items: number;
+  total_duration_hours: number;
   meetings_this_week: number;
-  meetings_this_month: number;
-  avg_duration_seconds: number;
-  avg_participants: number;
+  avg_duration_minutes: number;
 }
 
 export interface SpeakerTalkTime {
@@ -113,10 +117,11 @@ export interface TeamMember {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
-  role: "owner" | "admin" | "member" | "viewer";
-  meetings_count: number;
-  last_active_at: string | null;
-  joined_at: string;
+  role: string;
+  is_active: boolean;
+  onboarding_completed: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export async function getTeamMembers(): Promise<TeamMember[]> {
@@ -136,7 +141,7 @@ export async function removeMember(memberId: string): Promise<void> {
 }
 
 // Notifications
-export interface Notification {
+export interface AppNotification {
   id: string;
   title: string;
   body: string | null;
@@ -146,8 +151,8 @@ export interface Notification {
   created_at: string;
 }
 
-export async function getNotifications(): Promise<Notification[]> {
-  return api.get<Notification[]>("/api/v1/notifications");
+export async function getNotifications(): Promise<AppNotification[]> {
+  return api.get<AppNotification[]>("/api/v1/notifications");
 }
 
 export async function markNotificationRead(id: string): Promise<void> {

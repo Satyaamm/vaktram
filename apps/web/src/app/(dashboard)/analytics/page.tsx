@@ -54,9 +54,8 @@ const TEAL_PALETTE = [
   "#0d9488", // teal-600
 ];
 
-function formatDurationMinutes(seconds: number): string {
-  const mins = Math.round(seconds / 60);
-  return `${mins}m`;
+function formatDurationMinutes(minutes: number): string {
+  return `${Math.round(minutes)}m`;
 }
 
 function MetricCardSkeleton() {
@@ -122,16 +121,16 @@ function OverviewTab() {
     {
       title: "Avg Duration",
       value: overview
-        ? formatDurationMinutes(overview.avg_duration_seconds)
+        ? formatDurationMinutes(overview.avg_duration_minutes)
         : "--",
-      sub: `${overview?.meetings_this_month ?? 0} meetings this month`,
+      sub: `${overview?.meetings_this_week ?? 0} meetings this week`,
     },
     {
-      title: "Avg Participants",
-      value: overview?.avg_participants
-        ? Math.round(overview.avg_participants * 10) / 10
+      title: "Total Hours",
+      value: overview?.total_duration_hours
+        ? Math.round(overview.total_duration_hours * 10) / 10
         : 0,
-      sub: "per meeting",
+      sub: "recorded",
     },
   ];
 

@@ -10,6 +10,7 @@ import {
   stopBot,
   deleteMeeting,
 } from "@/lib/api/meetings";
+import type { Meeting } from "@/types";
 
 export function useMeetings(filters?: {
   status?: string;
@@ -18,7 +19,10 @@ export function useMeetings(filters?: {
 }) {
   return useQuery({
     queryKey: ["meetings", filters],
-    queryFn: () => getMeetings(filters),
+    queryFn: async (): Promise<Meeting[]> => {
+      const result = await getMeetings(filters);
+      return result.items;
+    },
   });
 }
 
@@ -50,8 +54,9 @@ export function useStartBot() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (meetingId: string) => startBot(meetingId),
-    onSuccess: (_data, meetingId) => {
+    mutationFn: ({ meetingId, meetingUrl }: { meetingId: string; meetingUrl: string }) =>
+      startBot(meetingId, meetingUrl),
+    onSuccess: (_data, { meetingId }) => {
       queryClient.invalidateQueries({ queryKey: ["meeting", meetingId] });
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
     },

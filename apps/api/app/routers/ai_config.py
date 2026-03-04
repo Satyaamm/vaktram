@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -152,3 +153,57 @@ async def delete_config(
     )
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="AI config not found")
+
+
+class AIConfigTestRequest(BaseModel):
+    provider: str
+    model_name: str
+    api_key: str | None = None
+    base_url: str | None = None
+
+
+class AIConfigTestResponse(BaseModel):
+    success: bool
+    message: str
+    response_time_ms: float | None = None
+
+
+@router.post("/test", response_model=AIConfigTestResponse)
+async def test_config(
+    payload: AIConfigTestRequest,
+    user: UserProfile = Depends(get_current_user),
+):
+    """Test an AI configuration by sending a simple prompt."""
+    import time
+
+    try:
+        from litellm import acompletion
+
+        start = time.time()
+        kwargs: dict = {
+            "model": f"{payload.provider}/{payload.model_name}" if payload.provider != "openai" else payload.model_name,
+            "messages": [{"role": "user", "content": "Say hello in exactly 3 words."}],
+            "max_tokens": 20,
+        }
+        if payload.api_key:
+            kwargs["api_key"] = payload.api_key
+        if payload.base_url:
+            kwargs["api_base"] = payload.base_url
+
+        response = await acompletion(**kwargs)
+        elapsed = round((time.time() - start) * 1000, 1)
+        return AIConfigTestResponse(
+            success=True,
+            message="Connection successful!",
+            response_time_ms=elapsed,
+        )
+    except ImportError:
+        return AIConfigTestResponse(
+            success=False,
+            message="LiteLLM not installed on this server.",
+        )
+    except Exception as exc:
+        return AIConfigTestResponse(
+            success=False,
+            message=f"Connection failed: {str(exc)[:200]}",
+        )

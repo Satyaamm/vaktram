@@ -86,7 +86,10 @@ export default function SearchPage() {
     isFetching,
   } = useQuery<SearchResult[]>({
     queryKey: ["search", debouncedQuery],
-    queryFn: () => searchMeetings(debouncedQuery),
+    queryFn: async () => {
+      const data = await searchMeetings(debouncedQuery);
+      return data.results;
+    },
     enabled: debouncedQuery.length > 0,
   });
 
@@ -217,7 +220,7 @@ export default function SearchPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {highlightMatch(result.text, debouncedQuery)}
+                    {highlightMatch(result.content, debouncedQuery)}
                   </p>
                 </CardContent>
               </Card>

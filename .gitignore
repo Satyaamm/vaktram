@@ -36,16 +36,30 @@ yarn-error.log*
 # Turbo
 .turbo
 
-# Python
+# Python virtual environments
 venv/
 .venv/
+env/
+.env_py/
+ENV/
+.ENV/
+virtualenv/
+.virtualenv/
+.python-version
+pip-selfcheck.json
+
+# Python build artifacts
 *.egg
 *.whl
+*.pyo
+*.pdb
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 htmlcov/
 .coverage
+.tox/
+.nox/
 
 # Docker
 *.log

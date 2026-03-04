@@ -77,7 +77,7 @@ import {
 
 const aiConfigSchema = z.object({
   provider: z.string().min(1, "Please select a provider"),
-  model: z.string().min(1, "Model name is required"),
+  model_name: z.string().min(1, "Model name is required"),
   api_key: z.string().min(1, "API key is required"),
   base_url: z.string().optional(),
 });
@@ -151,7 +151,7 @@ function ConfigForm({
     resolver: zodResolver(aiConfigSchema),
     defaultValues: {
       provider: editingConfig?.provider ?? "",
-      model: editingConfig?.model ?? "",
+      model_name: editingConfig?.model_name ?? "",
       api_key: "",
       base_url: editingConfig?.base_url ?? "",
     },
@@ -198,7 +198,7 @@ function ConfigForm({
 
   async function handleTest() {
     const values = form.getValues();
-    if (!values.provider || !values.model || !values.api_key) {
+    if (!values.provider || !values.model_name || !values.api_key) {
       toast({
         title: "Missing fields",
         description: "Fill in provider, model, and API key before testing.",
@@ -211,7 +211,7 @@ function ConfigForm({
     try {
       const result = await testAIConfig({
         provider: values.provider,
-        model: values.model,
+        model_name: values.model_name,
         api_key: values.api_key,
         base_url: values.base_url || undefined,
       });
@@ -296,7 +296,7 @@ function ConfigForm({
             {/* Model */}
             <FormField
               control={form.control}
-              name="model"
+              name="model_name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Model</FormLabel>
@@ -559,7 +559,7 @@ function SavedConfigsList({
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium">
                             {providerInfo?.name ?? config.provider} &mdash;{" "}
-                            {config.model}
+                            {config.model_name}
                           </p>
                           {config.is_default && (
                             <Badge className="bg-teal-100 text-teal-800 text-xs">
@@ -631,7 +631,7 @@ function SavedConfigsList({
             <DialogDescription>
               Are you sure you want to delete the{" "}
               <strong>
-                {deleteTarget?.provider} &mdash; {deleteTarget?.model}
+                {deleteTarget?.provider} &mdash; {deleteTarget?.model_name}
               </strong>{" "}
               configuration? This action cannot be undone.
             </DialogDescription>

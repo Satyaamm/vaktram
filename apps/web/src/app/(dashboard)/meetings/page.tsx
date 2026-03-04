@@ -240,8 +240,7 @@ export default function MeetingsPage() {
       platform: values.platform,
     };
     if (values.meeting_url) payload.meeting_url = values.meeting_url;
-    if (values.scheduled_at) payload.scheduled_at = values.scheduled_at;
-    if (values.description) payload.description = values.description;
+    if (values.scheduled_at) payload.scheduled_start = values.scheduled_at;
     createMeetingMutation.mutate(payload);
   }
 
@@ -503,7 +502,7 @@ export default function MeetingsPage() {
                           <span>{platformLabel(meeting.platform)}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{meeting.participant_count}</TableCell>
+                      <TableCell>{meeting.participants?.length ?? 0}</TableCell>
                       <TableCell>{statusBadge(meeting.status)}</TableCell>
                     </TableRow>
                   ))}

@@ -53,24 +53,23 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <Card className="w-full max-w-md">
+      <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-700 text-white">
-            <Mail className="h-6 w-6" />
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Mail className="h-5 w-5" />
           </div>
-          <CardTitle className="text-2xl">Check your email</CardTitle>
+          <CardTitle className="text-xl font-bold">Check your email</CardTitle>
           <CardDescription className="mt-2">
             We sent a password reset link to{" "}
-            <span className="font-medium text-foreground">{email}</span>. Click
-            the link in the email to reset your password.
+            <span className="font-medium text-foreground">{email}</span>.
           </CardDescription>
         </CardHeader>
-        <CardFooter className="justify-center">
+        <CardFooter className="justify-center pb-6">
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline underline-offset-2"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
             Back to sign in
           </Link>
         </CardFooter>
@@ -79,30 +78,30 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-700 text-white font-bold text-xl">
+    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
+      <CardHeader className="text-center pb-4">
+        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-base">
           V
         </div>
-        <CardTitle className="text-2xl">Forgot your password?</CardTitle>
-        <CardDescription>
-          Enter your email address and we&apos;ll send you a link to reset your
-          password.
+        <CardTitle className="text-xl font-bold">Forgot your password?</CardTitle>
+        <CardDescription className="text-sm">
+          Enter your email and we&apos;ll send you a reset link.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-6">
         {error && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="email">Email address</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-sm">Email</Label>
           <Input
             id="email"
             type="email"
             placeholder="you@company.com"
+            className="h-11 rounded-lg"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onKeyDown={(e) => {
@@ -112,8 +111,7 @@ export default function ForgotPasswordPage() {
           />
         </div>
         <Button
-          className="w-full bg-teal-700 hover:bg-teal-800 text-white"
-          size="lg"
+          className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
           onClick={handleResetRequest}
           disabled={loading}
         >
@@ -122,15 +120,15 @@ export default function ForgotPasswordPage() {
           ) : (
             <Mail className="mr-2 h-4 w-4" />
           )}
-          Send Reset Link
+          Send reset link
         </Button>
       </CardContent>
-      <CardFooter className="justify-center">
+      <CardFooter className="justify-center pb-6">
         <Link
           href="/login"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-3.5 w-3.5" />
           Back to sign in
         </Link>
       </CardFooter>

@@ -165,8 +165,8 @@ export default function MeetingDetailPage() {
             {meeting.title}
           </h1>
           <p className="text-muted-foreground">
-            {meeting.started_at
-              ? format(new Date(meeting.started_at), "MMM d, yyyy · h:mm a")
+            {meeting.actual_start
+              ? format(new Date(meeting.actual_start), "MMM d, yyyy · h:mm a")
               : format(new Date(meeting.created_at), "MMM d, yyyy")}
             {meeting.duration_seconds
               ? ` · ${formatDuration(meeting.duration_seconds)}`
@@ -181,15 +181,10 @@ export default function MeetingDetailPage() {
               {platformLabels[meeting.platform]}
             </Badge>
             <Badge variant="outline">
-              {meeting.participant_count} participant
-              {meeting.participant_count !== 1 ? "s" : ""}
+              {meeting.participants?.length ?? 0} participant
+              {(meeting.participants?.length ?? 0) !== 1 ? "s" : ""}
             </Badge>
           </div>
-          {meeting.description && (
-            <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-              {meeting.description}
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -204,10 +199,10 @@ export default function MeetingDetailPage() {
       </div>
 
       {/* Audio Player */}
-      {meeting.recording_url ? (
+      {meeting.audio_url ? (
         <AudioPlayer
           ref={audioPlayerRef}
-          audioUrl={meeting.recording_url}
+          audioUrl={meeting.audio_url}
           onTimeUpdate={handleTimeUpdate}
         />
       ) : (
@@ -229,7 +224,7 @@ export default function MeetingDetailPage() {
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="action-items">
             Action Items
-            {summary && summary.action_items.length > 0 && (
+            {summary && summary.action_items && summary.action_items.length > 0 && (
               <Badge
                 variant="secondary"
                 className="ml-2 h-5 px-1.5 text-xs bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
@@ -260,9 +255,9 @@ export default function MeetingDetailPage() {
                 ))}
               </CardContent>
             </Card>
-          ) : transcript && transcript.length > 0 ? (
+          ) : transcript && transcript.segments.length > 0 ? (
             <TranscriptViewer
-              segments={transcript}
+              segments={transcript.segments}
               currentTime={currentTime}
               onTimestampClick={handleTimestampClick}
             />
@@ -329,7 +324,7 @@ export default function MeetingDetailPage() {
                 ))}
               </CardContent>
             </Card>
-          ) : summary && summary.action_items.length > 0 ? (
+          ) : summary && summary.action_items && summary.action_items.length > 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>Action Items</CardTitle>
@@ -341,8 +336,9 @@ export default function MeetingDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {summary.action_items.map((item) => {
-                    const StatusIcon = statusIcons[item.status];
+                  {summary.action_items.map((rawItem) => {
+                    const item = rawItem as Record<string, string>;
+                    const StatusIcon = statusIcons[item.status as keyof typeof statusIcons];
 
                     return (
                       <div
@@ -369,7 +365,7 @@ export default function MeetingDetailPage() {
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="secondary"
-                            className={priorityConfig[item.priority]}
+                            className={priorityConfig[item.priority as keyof typeof priorityConfig]}
                           >
                             {item.priority}
                           </Badge>

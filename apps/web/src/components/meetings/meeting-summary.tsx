@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { MeetingSummary as MeetingSummaryType } from "@/types";
 
-const priorityConfig = {
+const priorityConfig: Record<string, { className: string; label: string }> = {
   high: {
     className: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
     label: "High",
@@ -36,7 +36,7 @@ const priorityConfig = {
   },
 };
 
-const statusIcons = {
+const statusIcons: Record<string, typeof Circle> = {
   pending: Circle,
   in_progress: Clock,
   completed: CheckCircle2,
@@ -47,6 +47,10 @@ interface MeetingSummaryProps {
 }
 
 export function MeetingSummary({ summary }: MeetingSummaryProps) {
+  const topics = summary.topics ?? [];
+  const actionItems = summary.action_items ?? [];
+  const decisions = summary.key_decisions ?? [];
+
   return (
     <div className="space-y-6">
       {/* Overview */}
@@ -59,13 +63,13 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            {summary.summary}
+            {summary.summary_text}
           </p>
         </CardContent>
       </Card>
 
       {/* Key Topics */}
-      {summary.key_topics.length > 0 && (
+      {topics.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -75,7 +79,7 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {summary.key_topics.map((topic) => (
+              {topics.map((topic: string) => (
                 <Badge
                   key={topic}
                   variant="outline"
@@ -90,7 +94,7 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
       )}
 
       {/* Action Items */}
-      {summary.action_items.length > 0 && (
+      {actionItems.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -98,19 +102,22 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
               Action Items
             </CardTitle>
             <CardDescription>
-              {summary.action_items.length} action item
-              {summary.action_items.length !== 1 ? "s" : ""} identified
+              {actionItems.length} action item
+              {actionItems.length !== 1 ? "s" : ""} identified
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {summary.action_items.map((item) => {
-                const StatusIcon = statusIcons[item.status];
-                const priority = priorityConfig[item.priority];
+              {actionItems.map((rawItem, idx) => {
+                const item = rawItem as Record<string, string>;
+                const StatusIcon =
+                  statusIcons[item.status] ?? Circle;
+                const priority =
+                  priorityConfig[item.priority] ?? priorityConfig.medium;
 
                 return (
                   <div
-                    key={item.id}
+                    key={item.id ?? idx}
                     className="flex items-start justify-between rounded-lg border p-4"
                   >
                     <div className="flex items-start gap-3">
@@ -145,7 +152,7 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
       )}
 
       {/* Decisions */}
-      {summary.decisions.length > 0 && (
+      {decisions.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -155,14 +162,17 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {summary.decisions.map((decision, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-teal-700 shrink-0" />
-                  <span className="text-sm text-muted-foreground">
-                    {decision}
-                  </span>
-                </li>
-              ))}
+              {decisions.map((rawDecision, i) => {
+                const decision = rawDecision as Record<string, string>;
+                return (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-teal-700 shrink-0" />
+                    <span className="text-sm text-muted-foreground">
+                      {decision.decision ?? decision.text ?? String(rawDecision)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </CardContent>
         </Card>
@@ -172,16 +182,20 @@ export function MeetingSummary({ summary }: MeetingSummaryProps) {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <span>Sentiment:</span>
-              <Badge variant="outline" className="capitalize">
-                {summary.sentiment}
-              </Badge>
-            </div>
-            <Separator orientation="vertical" className="h-4" />
+            {summary.sentiment && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span>Sentiment:</span>
+                  <Badge variant="outline" className="capitalize">
+                    {summary.sentiment}
+                  </Badge>
+                </div>
+                <Separator orientation="vertical" className="h-4" />
+              </>
+            )}
             <span>
-              Generated by {summary.llm_model} on{" "}
-              {new Date(summary.generated_at).toLocaleDateString()}
+              Generated by {summary.model_used ?? "AI"} on{" "}
+              {new Date(summary.created_at).toLocaleDateString()}
             </span>
           </div>
         </CardContent>

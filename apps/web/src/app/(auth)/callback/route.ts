@@ -13,12 +13,12 @@ export async function GET(request: Request) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (!error) {
-        // Auto-create user profile if it doesn't exist
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
         if (user) {
+          // Ensure user profile exists in our DB (via Supabase direct insert)
           const { data: existingProfile } = await supabase
             .from("user_profiles")
             .select("id")
@@ -33,11 +33,30 @@ export async function GET(request: Request) {
                 user.user_metadata?.full_name ||
                 user.user_metadata?.name ||
                 null,
-              avatar_url: user.user_metadata?.avatar_url || null,
+              avatar_url:
+                user.user_metadata?.avatar_url ||
+                user.user_metadata?.picture ||
+                null,
               role: "member",
               is_active: true,
               onboarding_completed: false,
             });
+          } else {
+            // Update avatar/name from SSO if they were missing
+            const updates: Record<string, string> = {};
+            const name =
+              user.user_metadata?.full_name || user.user_metadata?.name;
+            const avatar =
+              user.user_metadata?.avatar_url || user.user_metadata?.picture;
+            if (name) updates.full_name = name;
+            if (avatar) updates.avatar_url = avatar;
+
+            if (Object.keys(updates).length > 0) {
+              await supabase
+                .from("user_profiles")
+                .update(updates)
+                .eq("id", user.id);
+            }
           }
         }
 

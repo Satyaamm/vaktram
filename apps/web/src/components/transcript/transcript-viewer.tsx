@@ -98,7 +98,7 @@ export function TranscriptViewer({
                     </button>
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {segment.text}
+                    {segment.content}
                   </p>
                 </div>
               </div>

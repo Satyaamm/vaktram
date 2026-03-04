@@ -4,8 +4,9 @@ export interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   organization_id: string | null;
-  role: "owner" | "admin" | "member" | "viewer";
-  plan: "free" | "pro" | "team" | "enterprise";
+  role: string;
+  is_active: boolean;
+  onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -14,9 +15,8 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
-  owner_id: string;
-  plan: "free" | "pro" | "team" | "enterprise";
-  member_count: number;
+  logo_url: string | null;
+  max_seats: number;
   created_at: string;
   updated_at: string;
 }
@@ -24,78 +24,84 @@ export interface Organization {
 export interface Participant {
   id: string;
   meeting_id: string;
-  user_id: string | null;
   name: string;
   email: string | null;
-  role: "host" | "participant" | "guest";
-  talk_time_seconds: number;
-  joined_at: string;
-  left_at: string | null;
+  role: string | null;
+  speaking_duration_seconds: number | null;
 }
 
 export interface Meeting {
   id: string;
   title: string;
-  description: string | null;
-  organizer_id: string;
+  user_id: string;
   organization_id: string | null;
-  status: "scheduled" | "in_progress" | "completed" | "cancelled";
-  platform: "zoom" | "google_meet" | "teams" | "other";
+  status: "scheduled" | "in_progress" | "processing" | "transcribing" | "summarizing" | "completed" | "cancelled" | "failed";
+  platform: "google_meet" | "zoom" | "teams" | "other";
   meeting_url: string | null;
-  recording_url: string | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
   duration_seconds: number | null;
-  participant_count: number;
+  bot_id: string | null;
+  audio_url: string | null;
+  auto_record: boolean;
+  transcript_ready: boolean;
+  summary_ready: boolean;
   participants: Participant[];
-  started_at: string | null;
-  ended_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface MeetingList {
+  items: Meeting[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CreateMeetingInput {
+  title: string;
+  meeting_url?: string;
+  platform?: "google_meet" | "zoom" | "teams" | "other";
+  scheduled_start?: string;
+  scheduled_end?: string;
+  auto_record?: boolean;
+  participants?: { name: string; email?: string; role?: string }[];
 }
 
 export interface TranscriptSegment {
   id: string;
   meeting_id: string;
-  speaker_id: string | null;
   speaker_name: string;
-  text: string;
+  speaker_email: string | null;
+  content: string;
   start_time: number;
   end_time: number;
-  confidence: number;
-  language: string;
+  sequence_number: number;
+  confidence: number | null;
+  language: string | null;
+  created_at: string;
+}
+
+export interface FullTranscript {
+  meeting_id: string;
+  segments: TranscriptSegment[];
+  total_segments: number;
 }
 
 export interface MeetingSummary {
   id: string;
   meeting_id: string;
-  summary: string;
-  key_topics: string[];
-  action_items: ActionItem[];
-  decisions: string[];
-  sentiment: "positive" | "neutral" | "negative" | "mixed";
-  llm_provider: string;
-  llm_model: string;
-  generated_at: string;
-}
-
-export interface ActionItem {
-  id: string;
-  meeting_id: string;
-  title: string;
-  description: string | null;
-  assignee_id: string | null;
-  assignee_name: string | null;
-  due_date: string | null;
-  status: "pending" | "in_progress" | "completed";
-  priority: "low" | "medium" | "high";
+  summary_text: string;
+  action_items: Record<string, unknown>[] | null;
+  key_decisions: Record<string, unknown>[] | null;
+  topics: string[] | null;
+  sentiment: string | null;
+  model_used: string | null;
+  provider_used: string | null;
   created_at: string;
-}
-
-export interface CreateMeetingInput {
-  title: string;
-  description?: string;
-  platform: "zoom" | "google_meet" | "teams" | "other";
-  meeting_url?: string;
-  scheduled_at?: string;
+  updated_at: string;
 }
 
 export interface SearchResult {
@@ -103,7 +109,7 @@ export interface SearchResult {
   meeting_title: string;
   segment_id: string;
   speaker_name: string;
-  text: string;
+  content: string;
   start_time: number;
   end_time: number;
   score: number;
@@ -111,20 +117,22 @@ export interface SearchResult {
 
 export interface CalendarConnection {
   id: string;
-  provider: "google" | "outlook";
+  provider: string;
   calendar_id: string | null;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface UserAIConfig {
   id: string;
   user_id: string;
-  provider: "openai" | "anthropic" | "google" | "azure" | "ollama" | "custom";
-  model: string;
-  api_key_encrypted: string;
+  provider: string;
+  model_name: string;
+  has_api_key: boolean;
   base_url: string | null;
   is_default: boolean;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }

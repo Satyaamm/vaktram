@@ -162,15 +162,17 @@ export default function DashboardPage() {
     {
       title: "Hours Recorded",
       value: analytics
-        ? `${Math.round((analytics.total_duration_seconds / 3600) * 10) / 10}h`
+        ? `${Math.round(analytics.total_duration_hours * 10) / 10}h`
         : "0h",
-      description: `${analytics?.meetings_this_month ?? 0} meetings this month`,
+      description: `${analytics?.meetings_this_week ?? 0} this week`,
       icon: Clock,
     },
     {
-      title: "Action Items",
-      value: analytics?.total_action_items ?? 0,
-      description: `${analytics?.completed_action_items ?? 0} completed`,
+      title: "Avg Duration",
+      value: analytics
+        ? `${Math.round(analytics.avg_duration_minutes)}m`
+        : "0m",
+      description: "per meeting",
       icon: CheckSquare,
     },
     {
@@ -254,7 +256,7 @@ export default function DashboardPage() {
                         ? formatDuration(meeting.duration_seconds)
                         : "N/A"}{" "}
                       &middot; {platformIcon(meeting.platform)} &middot;{" "}
-                      {meeting.participant_count} participants
+                      {meeting.participants?.length ?? 0} participants
                     </p>
                   </div>
                   {statusBadge(meeting.status)}

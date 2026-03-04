@@ -344,7 +344,7 @@ function AIConfigTab() {
               <p className="text-sm font-medium">
                 Active:{" "}
                 <span className="capitalize">{defaultConfig.provider}</span>{" "}
-                &mdash; {defaultConfig.model}
+                &mdash; {defaultConfig.model_name}
               </p>
               <p className="text-xs text-muted-foreground">
                 This model is used for all AI-powered features.
@@ -637,19 +637,19 @@ function NotificationsTab() {
 // ---------------------------------------------------------------------------
 
 function BillingTab() {
-  const { data: profile, isLoading } = useQuery<UserProfile>({
+  const { isLoading } = useQuery<UserProfile>({
     queryKey: ["profile"],
     queryFn: getProfile,
   });
 
-  const plan = profile?.plan ?? "free";
+  const plan = "free" as const; // TODO: fetch from billing endpoint
   const planInfo = PLAN_LIMITS[plan];
 
   // Mock usage data (would come from API in production)
   const meetingsUsed = 23;
   const storageMb = 2100;
-  const meetingsLimit = planInfo.meetingsPerMonth;
-  const storageLimit = planInfo.storageMb;
+  const meetingsLimit: number = planInfo.meetingsPerMonth;
+  const storageLimit: number = planInfo.storageMb;
   const meetingsPercent =
     meetingsLimit === -1 ? 0 : Math.round((meetingsUsed / meetingsLimit) * 100);
   const storagePercent =

@@ -44,6 +44,7 @@ if settings.upstash_redis_url and settings.upstash_redis_token:
 
 # ── Routers ────────────────────────────────────────────────────────────
 from app.routers import (
+    auth,
     health,
     internal,
     meetings,
@@ -53,6 +54,7 @@ from app.routers import (
     bot,
     ai_config,
     analytics,
+    notifications,
     teams,
     calendar,
     webhooks,
@@ -62,6 +64,7 @@ from app.routers import (
 API_PREFIX = "/api/v1"
 
 app.include_router(health.router)  # /health at root level
+app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(meetings.router, prefix=API_PREFIX)
 app.include_router(transcripts.router, prefix=API_PREFIX)
 app.include_router(summaries.router, prefix=API_PREFIX)
@@ -69,6 +72,7 @@ app.include_router(search.router, prefix=API_PREFIX)
 app.include_router(bot.router, prefix=API_PREFIX)
 app.include_router(ai_config.router, prefix=API_PREFIX)
 app.include_router(analytics.router, prefix=API_PREFIX)
+app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(teams.router, prefix=API_PREFIX)
 app.include_router(calendar.router, prefix=API_PREFIX)
 app.include_router(webhooks.router, prefix=API_PREFIX)

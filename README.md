@@ -17,17 +17,17 @@ AI-powered meeting notes platform with BYOM (Bring Your Own Model) support. Reco
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, TypeScript, shadcn/ui, Tailwind CSS |
-| Backend | FastAPI, SQLAlchemy 2.0, Pydantic v2 |
-| Database | Supabase PostgreSQL + pgvector |
-| Auth | Supabase Auth (OAuth, magic link) |
-| LLM Router | LiteLLM (100+ providers) |
-| Transcription | Faster-Whisper + pyannote.audio |
-| Bot | Playwright + PulseAudio + FFmpeg |
-| Cache/Queue | Upstash Redis + QStash |
-| Monorepo | Turborepo |
+| Layer         | Technology                                      |
+| ------------- | ----------------------------------------------- |
+| Frontend      | Next.js 14, TypeScript, shadcn/ui, Tailwind CSS |
+| Backend       | FastAPI, SQLAlchemy 2.0, Pydantic v2            |
+| Database      | Supabase PostgreSQL + pgvector                  |
+| Auth          | Supabase Auth (OAuth, magic link)               |
+| LLM Router    | LiteLLM (100+ providers)                        |
+| Transcription | Faster-Whisper + pyannote.audio                 |
+| Bot           | Playwright + PulseAudio + FFmpeg                |
+| Cache/Queue   | Upstash Redis + QStash                          |
+| Monorepo      | Turborepo                                       |
 
 ## Quick Start
 
@@ -87,15 +87,56 @@ vaktram/
 
 ## SaaS Tiers
 
-| Feature | Free | Pro | Team | Enterprise |
-|---------|------|-----|------|------------|
-| Meetings/month | 5 | Unlimited | Unlimited | Unlimited |
-| LLM | Gemini Flash | BYOM | BYOM | BYOM |
-| Users | 1 | 1 | 10 | Unlimited |
-| SSO/SAML | - | - | - | Yes |
-| API Access | - | - | - | Yes |
-| Audit Logs | - | - | - | Yes |
+| Feature        | Free         | Pro       | Team      | Enterprise |
+| -------------- | ------------ | --------- | --------- | ---------- |
+| Meetings/month | 5            | Unlimited | Unlimited | Unlimited  |
+| LLM            | Gemini Flash | BYOM      | BYOM      | BYOM       |
+| Users          | 1            | 1         | 10        | Unlimited  |
+| SSO/SAML       | -            | -         | -         | Yes        |
+| API Access     | -            | -         | -         | Yes        |
+| Audit Logs     | -            | -         | -         | Yes        |
 
 ## License
 
 Proprietary. All rights reserved.
+
+---
+
+  <!-- Running the Frontend (Next.js)
+cd apps/web                                               
+  npm install        # first time only
+  npm run dev
+
+  Runs on http://localhost:3000
+
+  Make sure apps/web/.env.local has your Supabase credentials (it already does).
+
+  ---
+  Running the Backend (FastAPI)
+
+  cd apps/api
+  python -m venv venv          # first time only
+  source venv/bin/activate     # on macOS/Linux
+  pip install -r requirements.txt  # first time only
+
+  uvicorn app.main:app --reload --port 8000
+
+  Runs on http://localhost:8000
+
+  You'll need a .env file in apps/api/ with:
+  SUPABASE_DB_URL=postgresql://postgres:password@db.epdymcjwgnuoojoniqwp.supabase.co:5432/postgres
+  SUPABASE_JWT_SECRET=<your-jwt-secret-from-supabase-dashboard>
+  GOOGLE_AI_API_KEY=<your-gemini-key>
+  ENCRYPTION_KEY=<32-byte-key>
+
+  Get the JWT secret from: Supabase Dashboard → Settings → API → JWT Secret
+
+  ---
+  Both at once (Turborepo)
+
+  From the repo root:
+  npm install       # installs all workspace deps
+  npx turbo dev     # runs dev for all packages
+
+  This starts the frontend on :3000. The backend still needs to be started separately with uvicorn since it's Python.
+ -->
