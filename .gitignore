@@ -64,11 +64,13 @@ htmlcov/
 # Docker
 *.log
 
-# ML Models (large files)
+# ML Models (large weight files only — NOT Python `models/` packages)
 *.bin
 *.pt
 *.onnx
-models/
+*.safetensors
+*.ckpt
+/ml-models/
 
 # Sentry
 .sentryclirc
