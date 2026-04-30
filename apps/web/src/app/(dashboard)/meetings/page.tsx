@@ -9,6 +9,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Plus,
+  Upload,
   Video,
   Monitor,
   Users as UsersIcon,
@@ -16,9 +17,10 @@ import {
   ChevronRight,
   ArrowUpDown,
   Loader2,
+  FileAudio,
 } from "lucide-react";
 import { useMeetings } from "@/lib/hooks/use-meeting";
-import { createMeeting } from "@/lib/api/meetings";
+import { createMeeting, uploadAudio } from "@/lib/api/meetings";
 import type { Meeting, CreateMeetingInput } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -175,6 +177,9 @@ export default function MeetingsPage() {
   const [page, setPage] = useState(1);
   const [sortDesc, setSortDesc] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadTitle, setUploadTitle] = useState("");
 
   // Debounce search input
   useEffect(() => {
@@ -223,6 +228,19 @@ export default function MeetingsPage() {
     },
   });
 
+  // Upload audio mutation
+  const uploadMutation = useMutation({
+    mutationFn: ({ file, title }: { file: File; title: string }) =>
+      uploadAudio(file, title || undefined),
+    onSuccess: (meeting) => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      setUploadDialogOpen(false);
+      setUploadFile(null);
+      setUploadTitle("");
+      router.push(`/meetings/${meeting.id}`);
+    },
+  });
+
   const form = useForm<CreateMeetingFormValues>({
     resolver: zodResolver(createMeetingSchema),
     defaultValues: {
@@ -256,6 +274,110 @@ export default function MeetingsPage() {
             View and manage all your recorded meetings.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Audio
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Upload Audio Recording</DialogTitle>
+              <DialogDescription>
+                Upload an audio or video file to transcribe and generate AI notes. Supported: MP3, WAV, FLAC, M4A, WebM, MP4 (max 100 MB).
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Title</label>
+                <Input
+                  placeholder="e.g. Q3 Planning Discussion"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Audio File</label>
+                <div
+                  className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-teal-500 transition-colors"
+                  onClick={() => document.getElementById("audio-upload-input")?.click()}
+                >
+                  <input
+                    id="audio-upload-input"
+                    type="file"
+                    accept=".mp3,.wav,.flac,.m4a,.webm,.mp4,audio/*,video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setUploadFile(f);
+                        if (!uploadTitle) {
+                          setUploadTitle(f.name.replace(/\.[^/.]+$/, ""));
+                        }
+                      }
+                    }}
+                  />
+                  {uploadFile ? (
+                    <div className="flex items-center justify-center gap-2 text-teal-700">
+                      <FileAudio className="h-5 w-5" />
+                      <span className="text-sm font-medium">{uploadFile.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({(uploadFile.size / 1024 / 1024).toFixed(1)} MB)
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Click to select an audio file
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {uploadMutation.isError && (
+                <p className="text-sm text-red-600">
+                  {uploadMutation.error instanceof Error
+                    ? uploadMutation.error.message
+                    : "Upload failed. Please try again."}
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadDialogOpen(false);
+                  setUploadFile(null);
+                  setUploadTitle("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-teal-700 hover:bg-teal-800 text-white"
+                disabled={!uploadFile || uploadMutation.isPending}
+                onClick={() => {
+                  if (uploadFile) {
+                    uploadMutation.mutate({ file: uploadFile, title: uploadTitle });
+                  }
+                }}
+              >
+                {uploadMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload & Transcribe"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-teal-700 hover:bg-teal-800 text-white">
@@ -384,6 +506,7 @@ export default function MeetingsPage() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Filter Bar */}

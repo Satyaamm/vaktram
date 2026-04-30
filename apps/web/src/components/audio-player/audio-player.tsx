@@ -97,7 +97,11 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, AudioPlayerProps>(
       wavesurferRef.current = ws;
 
       return () => {
-        ws.destroy();
+        try {
+          ws.destroy();
+        } catch {
+          // Ignore abort errors during cleanup
+        }
         wavesurferRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps

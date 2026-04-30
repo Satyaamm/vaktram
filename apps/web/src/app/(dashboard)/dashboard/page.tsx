@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WelcomeBanner } from "@/components/onboarding/welcome-banner";
+import { ByomRequired } from "@/components/onboarding/byom-required";
 import type { Meeting } from "@/types";
 
 function formatDuration(seconds: number): string {
@@ -140,17 +142,16 @@ export default function DashboardPage() {
   } = useQuery<AnalyticsOverview>({
     queryKey: ["analytics", "overview"],
     queryFn: getAnalyticsOverview,
+    retry: 1,
   });
 
-  const {
-    data: teamMembers,
-    isLoading: teamLoading,
-  } = useQuery<TeamMember[]>({
+  const { data: teamMembers } = useQuery<TeamMember[]>({
     queryKey: ["team", "members"],
     queryFn: getTeamMembers,
+    retry: false,
   });
 
-  const isStatsLoading = analyticsLoading || teamLoading;
+  const isStatsLoading = analyticsLoading;
 
   const stats = [
     {
@@ -193,6 +194,9 @@ export default function DashboardPage() {
           Your AI-powered meeting intelligence dashboard.
         </p>
       </div>
+
+      <ByomRequired feature="summaries, Vakta, and semantic search" />
+      <WelcomeBanner />
 
       {/* Stats Grid */}
       {isStatsLoading ? (

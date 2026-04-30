@@ -46,9 +46,7 @@ async def authorize(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google Calendar integration is not configured",
         )
-    # CalendarService doesn't need db for this method, but we keep the pattern
-    from sqlalchemy.ext.asyncio import AsyncSession as _AS
-
+    # get_authorize_url doesn't use DB, so None is safe here
     svc = CalendarService(None)  # type: ignore[arg-type]
     url = svc.get_authorize_url(user.id)
     return CalendarAuthorizeResponse(authorization_url=url)
@@ -93,7 +91,6 @@ async def sync_calendar(
     """Manually trigger a calendar sync."""
     svc = CalendarService(db)
     synced_count, new_titles = await svc.sync_events(user.id)
-    await db.commit()
     return CalendarSyncResponse(synced_count=synced_count, new_meetings=new_titles)
 
 
@@ -108,4 +105,3 @@ async def disconnect(
     deleted = await svc.disconnect(user.id, connection_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Calendar connection not found")
-    await db.commit()

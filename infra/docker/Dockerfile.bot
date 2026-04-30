@@ -44,13 +44,17 @@ COPY apps/bot-service/bot/ bot/
 
 RUN mkdir -p /tmp/vaktram/audio
 
+# Copy entrypoint that brings PulseAudio up properly before uvicorn.
+COPY apps/bot-service/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 ENV PULSE_SERVER=unix:/tmp/pulseaudio.socket
 ENV HEADLESS=true
-ENV BOT_SERVICE_PORT=8100
+ENV BOT_SERVICE_PORT=8001
 
-EXPOSE 8100
+EXPOSE 8001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8100/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:${BOT_SERVICE_PORT}/health || exit 1
 
-CMD ["sh", "-c", "pulseaudio --daemonize --system --disallow-exit && uvicorn bot.main:app --host 0.0.0.0 --port ${BOT_SERVICE_PORT}"]
+ENTRYPOINT ["/entrypoint.sh"]

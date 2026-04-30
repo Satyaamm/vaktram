@@ -11,10 +11,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
-      - API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     volumes:
       - ./apps/web/src:/app/apps/web/src
     depends_on:
@@ -30,26 +28,28 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${SUPABASE_DB_URL}
-      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-}
       - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
       - UPSTASH_REDIS_TOKEN=${UPSTASH_REDIS_TOKEN}
       - QSTASH_TOKEN=${QSTASH_TOKEN}
+      - QSTASH_CURRENT_SIGNING_KEY=${QSTASH_CURRENT_SIGNING_KEY}
+      - QSTASH_NEXT_SIGNING_KEY=${QSTASH_NEXT_SIGNING_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
       - DEFAULT_LLM_MODEL=${DEFAULT_LLM_MODEL}
+      - DEFAULT_LLM_PROVIDER=${DEFAULT_LLM_PROVIDER}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - ENVIRONMENT=development
       - BOT_SERVICE_URL=http://bot:8001
+      - DIARIZATION_SERVICE_URL=http://diarization:8002
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
     volumes:
       - ./apps/api:/app/apps/api
+      - audio-data:/tmp/vaktram
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -57,38 +57,34 @@ services:
       retries: 3
 
   # ============================================
-  # Meeting Bot Service
+  # Meeting Bot Service (Playwright + PulseAudio)
   # ============================================
   bot:
     build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.bot
+      context: ./apps/bot-service
+      dockerfile: Dockerfile
     ports:
       - "8001:8001"
     environment:
       - API_URL=http://api:8000
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - BOT_SERVICE_PORT=8001
     volumes:
-      - ./apps/bot-service:/app/apps/bot-service
-    # Needs PulseAudio for audio capture
+      - audio-data:/tmp/vaktram
     privileged: true
 
   # ============================================
-  # Transcription Worker
+  # Speaker Diarization Service (pyannote.audio)
   # ============================================
-  transcription-worker:
+  diarization:
     build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.transcription
+      context: ./apps/workers/diarization
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
     environment:
-      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - HF_TOKEN=${HF_TOKEN}
-      - API_URL=http://api:8000
+      - LOG_LEVEL=INFO
     volumes:
-      - ./apps/workers/transcription:/app/apps/workers/transcription
       - model-cache:/root/.cache
     deploy:
       resources:
@@ -98,24 +94,6 @@ services:
               count: all
               capabilities: [gpu]
 
-  # ============================================
-  # Summarization Worker
-  # ============================================
-  summarization-worker:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.summarizer
-    environment:
-      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
-      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
-      - DEFAULT_LLM_MODEL=${DEFAULT_LLM_MODEL}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - API_URL=http://api:8000
-    volumes:
-      - ./apps/workers/summarizer:/app/apps/workers/summarizer
-      - model-cache:/root/.cache
-
 volumes:
+  audio-data:
   model-cache:

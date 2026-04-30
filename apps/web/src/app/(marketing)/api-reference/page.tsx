@@ -170,7 +170,7 @@ export default function ApiReferencePage() {
             custom={1}
           >
             The Vaktram REST API. All endpoints require a Bearer token from
-            Supabase authentication.
+            JWT authentication.
           </motion.p>
         </div>
       </section>
@@ -183,10 +183,10 @@ export default function ApiReferencePage() {
               Authentication
             </h3>
             <p className="text-sm text-slate-600 mb-3">
-              Include the Supabase access token in the Authorization header:
+              Include your access token in the Authorization header:
             </p>
             <code className="block bg-slate-900 text-slate-100 text-sm rounded-md px-4 py-3 font-mono">
-              Authorization: Bearer {"<your-supabase-access-token>"}
+              Authorization: Bearer {"<your-access-token>"}
             </code>
           </div>
         </div>

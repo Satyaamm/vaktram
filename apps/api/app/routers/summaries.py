@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
@@ -46,7 +46,7 @@ async def generate_summary(
     )
 
 
-@router.delete("/{meeting_id}", status_code=204)
+@router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_summary(
     meeting_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

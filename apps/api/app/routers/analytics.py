@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -66,9 +66,7 @@ async def get_overview(
     avg_duration_seconds = dur_row[1] or 0
 
     # Meetings this week (last 7 days)
-    from datetime import timedelta
-
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     week_q = select(func.count()).select_from(
         base.where(Meeting.created_at >= week_ago).subquery()
     )
@@ -81,6 +79,36 @@ async def get_overview(
         total_duration_hours=round(total_duration_seconds / 3600, 2),
         avg_duration_minutes=round(avg_duration_seconds / 60, 2),
         meetings_this_week=meetings_this_week,
+    )
+
+
+class UsageResponse(BaseModel):
+    meetings_this_month: int
+    storage_used_mb: float
+    plan: str
+
+
+@router.get("/usage", response_model=UsageResponse)
+async def get_usage(
+    db: AsyncSession = Depends(get_db),
+    user: UserProfile = Depends(get_current_user),
+):
+    """Get current month usage for the authenticated user."""
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    q = select(func.count()).select_from(
+        select(Meeting)
+        .where(Meeting.user_id == user.id, Meeting.created_at >= month_start)
+        .subquery()
+    )
+    result = await db.execute(q)
+    meetings_this_month = result.scalar() or 0
+
+    return UsageResponse(
+        meetings_this_month=meetings_this_month,
+        storage_used_mb=0.0,
+        plan="free",
     )
 
 
@@ -130,13 +158,13 @@ class MeetingFrequencyItem(BaseModel):
 
 @router.get("/frequency", response_model=list[MeetingFrequencyItem])
 async def get_frequency(
-    period: str = Query("30d", regex="^(7d|30d|90d)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
     user: UserProfile = Depends(get_current_user),
 ):
     """Get meeting frequency over time."""
     days = {"7d": 7, "30d": 30, "90d": 90}[period]
-    start = datetime.utcnow() - timedelta(days=days)
+    start = datetime.now(timezone.utc) - timedelta(days=days)
     q = (
         select(
             cast(Meeting.created_at, Date).label("date"),

@@ -332,7 +332,7 @@ function MembersTable({ members }: { members: TeamMember[] }) {
               <TableRow>
                 <TableHead>Member</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Meetings</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Last Active</TableHead>
                 <TableHead className="w-10" />
               </TableRow>

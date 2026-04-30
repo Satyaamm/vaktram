@@ -13,7 +13,7 @@ fi
 
 SUPABASE_URL=$(grep -E "^NEXT_PUBLIC_SUPABASE_URL=" "$ENV_FILE" | sed 's/^NEXT_PUBLIC_SUPABASE_URL=//')
 SERVICE_KEY=$(grep -E "^SUPABASE_SERVICE_ROLE_KEY=" "$ENV_FILE" | sed 's/^SUPABASE_SERVICE_ROLE_KEY=//')
-DB_PASSWORD=$(grep -E "^SUPABASE_DB_URL=" "$ENV_FILE" | sed 's/^SUPABASE_DB_URL=//' | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|')
+DB_PASSWORD=$(grep -E "^DATABASE_URL=" "$ENV_FILE" | sed 's/^DATABASE_URL=//' | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|')
 PROJECT_REF=$(echo "$SUPABASE_URL" | sed -E 's|https://([^.]+)\.supabase\.co|\1|')
 
 if [ -z "$SUPABASE_URL" ] || [ -z "$SERVICE_KEY" ]; then

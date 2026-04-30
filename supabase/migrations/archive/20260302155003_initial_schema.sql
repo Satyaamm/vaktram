@@ -2,8 +2,6 @@
 -- Vaktram: Initial Schema
 -- ============================================
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Enums
 CREATE TYPE meeting_status AS ENUM (
   'scheduled', 'in_progress', 'processing', 'transcribing',
@@ -16,7 +14,7 @@ CREATE TYPE meeting_platform AS ENUM (
 
 -- Organizations
 CREATE TABLE organizations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(255) UNIQUE NOT NULL,
   logo_url TEXT,
@@ -27,7 +25,7 @@ CREATE TABLE organizations (
 
 -- User Profiles
 CREATE TABLE user_profiles (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
   full_name VARCHAR(255),
   avatar_url TEXT,
@@ -41,7 +39,7 @@ CREATE TABLE user_profiles (
 
 -- Meetings
 CREATE TABLE meetings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profiles(id),
   organization_id UUID REFERENCES organizations(id),
   title VARCHAR(500) NOT NULL,
@@ -68,7 +66,7 @@ CREATE INDEX idx_meetings_user_id ON meetings(user_id);
 
 -- Meeting Participants
 CREATE TABLE meeting_participants (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255),
@@ -80,7 +78,7 @@ CREATE TABLE meeting_participants (
 
 -- Transcript Segments
 CREATE TABLE transcript_segments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
   speaker_name VARCHAR(255) NOT NULL,
   speaker_email VARCHAR(255),
@@ -97,7 +95,7 @@ CREATE INDEX idx_transcript_segments_meeting_id ON transcript_segments(meeting_i
 
 -- Meeting Summaries
 CREATE TABLE meeting_summaries (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   meeting_id UUID NOT NULL UNIQUE REFERENCES meetings(id) ON DELETE CASCADE,
   summary_text TEXT NOT NULL,
   action_items JSONB,
@@ -113,7 +111,7 @@ CREATE INDEX idx_meeting_summaries_meeting_id ON meeting_summaries(meeting_id);
 
 -- User AI Configs (BYOM)
 CREATE TABLE user_ai_configs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   provider VARCHAR(50) NOT NULL,
   model_name VARCHAR(100) NOT NULL,
@@ -128,7 +126,7 @@ CREATE INDEX idx_user_ai_configs_user_id ON user_ai_configs(user_id);
 
 -- Calendar Connections
 CREATE TABLE calendar_connections (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   provider VARCHAR(50) NOT NULL,
   access_token_encrypted TEXT,
@@ -143,7 +141,7 @@ CREATE TABLE calendar_connections (
 
 -- Meeting Embeddings
 CREATE TABLE meeting_embeddings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
   segment_id UUID REFERENCES transcript_segments(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
@@ -156,7 +154,7 @@ CREATE INDEX idx_meeting_embeddings_meeting_id ON meeting_embeddings(meeting_id)
 
 -- API Keys
 CREATE TABLE api_keys (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   name VARCHAR(100) NOT NULL,
   key_hash VARCHAR(255) NOT NULL UNIQUE,
@@ -170,7 +168,7 @@ CREATE TABLE api_keys (
 
 -- Audit Logs
 CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
   action VARCHAR(100) NOT NULL,
   resource_type VARCHAR(50) NOT NULL,
@@ -182,7 +180,7 @@ CREATE TABLE audit_logs (
 
 -- Notifications
 CREATE TABLE notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   body TEXT,

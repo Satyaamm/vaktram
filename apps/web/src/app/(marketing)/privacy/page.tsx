@@ -22,11 +22,11 @@ const sections = [
   },
   {
     title: "3. Data Storage & Security",
-    content: `Your data is stored in Supabase (PostgreSQL) with row-level security enabled. Meeting audio files are stored in Supabase Storage with access controls. All data is encrypted in transit (TLS) and at rest. API keys you provide for BYOM are encrypted using AES-256 before storage.`,
+    content: `Your data is stored in PostgreSQL with row-level security enabled. Meeting audio files are stored with access controls. All data is encrypted in transit (TLS) and at rest. API keys you provide for BYOM are encrypted using AES-256 before storage.`,
   },
   {
     title: "4. Third-Party Services",
-    content: `Vaktram integrates with third-party services to provide its functionality: Supabase (authentication and database), Google Calendar API (calendar sync), and your chosen LLM provider when using BYOM. Each of these services has its own privacy policy. When using the default Gemini model, meeting content is sent to Google's API for summarization.`,
+    content: `Vaktram integrates with third-party services to provide its functionality: Google Calendar API (calendar sync) and your chosen LLM provider when using BYOM. Each of these services has its own privacy policy. When using the default Gemini model, meeting content is sent to Google's API for summarization.`,
   },
   {
     title: "5. Your Rights",

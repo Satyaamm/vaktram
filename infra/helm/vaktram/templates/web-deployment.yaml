@@ -1,0 +1,39 @@
+{{- $name := printf "%s-web" .Release.Name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: { app: vaktram-web, release: {{ .Release.Name }} }
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels: { app: vaktram-web, release: {{ .Release.Name }} }
+  template:
+    metadata:
+      labels: { app: vaktram-web, release: {{ .Release.Name }} }
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.web.image }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          ports: [ { containerPort: 3000 } ]
+          envFrom:
+            - secretRef: { name: {{ .Release.Name }}-env }
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources: {{- toYaml .Values.web.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  selector: { app: vaktram-web, release: {{ .Release.Name }} }
+  ports:
+    - { name: http, port: 80, targetPort: 3000 }

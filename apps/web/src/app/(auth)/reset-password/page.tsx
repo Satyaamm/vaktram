@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +15,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from "@/lib/supabase/client";
 import { Loader2, Lock, CheckCircle } from "lucide-react";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,8 +35,9 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
-  const supabase = createClient();
+  const resetToken = searchParams.get("token") || "";
 
   const handleResetPassword = async () => {
     setError(null);
@@ -44,12 +54,21 @@ export default function ResetPasswordPage() {
       setError("Passwords do not match.");
       return;
     }
+    if (!resetToken) {
+      setError("Invalid or missing reset token.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) {
-        setError(error.message);
+      const res = await fetch(`${API_BASE}/api/v1/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: resetToken, new_password: password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err.detail || "Something went wrong.");
       } else {
         setSuccess(true);
         toast({

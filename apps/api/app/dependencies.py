@@ -7,6 +7,7 @@ import uuid
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.middleware.auth import get_current_user_from_token
 from app.models.team import UserProfile
@@ -23,11 +24,7 @@ async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> UserProfile:
-    """Return the authenticated UserProfile.
-
-    Decodes the JWT, extracts the ``sub`` claim (Supabase user id),
-    and fetches the corresponding UserProfile row.
-    """
+    """Return the authenticated UserProfile from the JWT."""
     payload = await get_current_user_from_token(request)
     user_id_str: str | None = payload.get("sub")
     if not user_id_str:
@@ -44,29 +41,16 @@ async def get_current_user(
         )
 
     result = await db.execute(
-        select(UserProfile).where(UserProfile.id == user_uuid)
+        select(UserProfile)
+        .options(selectinload(UserProfile.organization))
+        .where(UserProfile.id == user_uuid)
     )
     user = result.scalar_one_or_none()
     if user is None:
-        # Auto-create user profile on first API call
-        email = payload.get("email")
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User profile not found and no email in token",
-            )
-        user_meta = payload.get("user_metadata", {})
-        user = UserProfile(
-            id=user_uuid,
-            email=email,
-            full_name=user_meta.get("full_name") or user_meta.get("name"),
-            role="member",
-            is_active=True,
-            onboarding_completed=False,
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
         )
-        db.add(user)
-        await db.flush()
-        await db.refresh(user)
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

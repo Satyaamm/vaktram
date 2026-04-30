@@ -119,6 +119,23 @@ async def invite_member(
     if user.role not in ("admin", "owner"):
         raise HTTPException(status_code=403, detail="Only admins can invite members")
 
+    # Check seat limit
+    org_result = await db.execute(
+        select(Organization).where(Organization.id == user.organization_id)
+    )
+    org = org_result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    member_count_result = await db.execute(
+        select(UserProfile).where(UserProfile.organization_id == user.organization_id)
+    )
+    current_count = len(member_count_result.scalars().all())
+    if current_count >= org.max_seats:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Organization has reached its seat limit ({org.max_seats})",
+        )
+
     # Check if user already exists
     result = await db.execute(
         select(UserProfile).where(UserProfile.email == payload.email)
@@ -140,6 +157,8 @@ async def invite_member(
         role=payload.role,
         is_active=True,
         onboarding_completed=False,
+        timezone="UTC",
+        language="en",
     )
     db.add(new_user)
     await db.flush()

@@ -1,0 +1,133 @@
+# Vaktram Helm values. Override per-environment in values-{prod,staging,onprem}.yaml.
+
+global:
+  imageRegistry: ghcr.io/vaktram
+  imageTag: latest
+  region: us-east-1
+  domain: app.vaktram.com
+  apiDomain: api.vaktram.com
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 3
+  image: api
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits:   { cpu: 2,    memory: 2Gi }
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 70
+  env: {}  # populated from sealed secrets
+
+web:
+  replicas: 2
+  image: web
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits:   { cpu: 1,    memory: 1Gi }
+
+bot:
+  replicas: 5
+  image: bot
+  # One bot per pod — Playwright is heavyweight and we want one meeting per pod.
+  hpa:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 100
+    metrics:
+      - type: External
+        external:
+          metric: { name: queue_depth_bot_jobs }
+          target: { type: AverageValue, averageValue: "1" }
+  resources:
+    requests: { cpu: 1,   memory: 2Gi }
+    limits:   { cpu: 2,   memory: 4Gi }
+
+workerTranscribe:
+  replicas: 3
+  image: transcription
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+
+workerSummarize:
+  replicas: 2
+  image: summarizer
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 15
+
+workerDiarize:
+  replicas: 1
+  image: diarization
+  # GPU node pool. Keep low min — GPU is expensive.
+  nodeSelector: { "nvidia.com/gpu": "true" }
+  resources:
+    requests: { cpu: 2,    memory: 8Gi, "nvidia.com/gpu": 1 }
+    limits:   { cpu: 4,    memory: 16Gi, "nvidia.com/gpu": 1 }
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+
+postgres:
+  external: true   # SaaS uses Supabase / RDS
+  url: ""          # injected via secret
+
+redis:
+  external: true
+  url: ""
+
+storage:
+  bucket: vaktram-audio
+  region: us-east-1
+
+ingress:
+  enabled: true
+  className: nginx
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+
+# On-prem flag bundles components for air-gapped installs.
+onprem:
+  enabled: false
+  # When true, postgres + redis must be deployed inside the cluster.
+
+# Shared env injected into every deployment via a single Secret. Override on
+# install with `--set secrets.JWT_SECRET=...` or use a sealed-secrets / external
+# secrets controller in real environments.
+secrets:
+  DATABASE_URL: ""
+  JWT_SECRET: ""
+  ENCRYPTION_KEY: ""
+  GROQ_API_KEY: ""
+  GOOGLE_AI_API_KEY: ""
+  UPSTASH_REDIS_URL: ""
+  UPSTASH_REDIS_TOKEN: ""
+  QSTASH_TOKEN: ""
+  QSTASH_CURRENT_SIGNING_KEY: ""
+  QSTASH_NEXT_SIGNING_KEY: ""
+  STRIPE_API_KEY: ""
+  STRIPE_WEBHOOK_SECRET: ""
+  R2_ACCOUNT_ID: ""
+  R2_ACCESS_KEY_ID: ""
+  R2_SECRET_ACCESS_KEY: ""
+  R2_BUCKET: "vaktram-audio"
+  STORAGE_BUCKET: "vaktram-audio"
+  RESEND_API_KEY: ""
+  OPENAI_API_KEY: ""
+  HF_TOKEN: ""
+  SENTRY_DSN: ""
+  OTEL_EXPORTER_ENDPOINT: ""
+  DIARIZATION_SERVICE_URL: ""

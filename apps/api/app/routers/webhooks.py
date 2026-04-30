@@ -51,17 +51,32 @@ async def bot_event_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Handle bot status callback events (e.g. from Recall.ai)."""
+    """Handle bot status callback events from the self-hosted bot service."""
     body = await request.json()
     event_type = body.get("event")
-    meeting_bot_id = body.get("bot_id")
+    meeting_id = body.get("meeting_id")
 
-    if not event_type or not meeting_bot_id:
+    if not event_type or not meeting_id:
         raise HTTPException(status_code=400, detail="Invalid webhook payload")
 
-    # Route event to appropriate handler
-    from app.services.bot_service import BotService
+    import uuid
+    from app.models.meeting import Meeting, MeetingStatus
+    from sqlalchemy import select
 
-    service = BotService(db)
-    await service.handle_bot_event(event_type=event_type, bot_id=meeting_bot_id, payload=body)
+    mid = uuid.UUID(meeting_id)
+    result = await db.execute(select(Meeting).where(Meeting.id == mid))
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    if event_type == "bot_joined":
+        meeting.status = MeetingStatus.in_progress
+        meeting.bot_id = "active"
+    elif event_type == "bot_left":
+        meeting.status = MeetingStatus.processing
+    elif event_type == "bot_error":
+        meeting.status = MeetingStatus.failed
+        meeting.error_message = body.get("error", "Bot error")
+    await db.flush()
+
     return {"status": "ok"}

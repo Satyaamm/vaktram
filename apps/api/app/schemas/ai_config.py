@@ -12,6 +12,10 @@ class AIConfigBase(BaseModel):
     provider: str = Field(..., max_length=50)
     model_name: str = Field(..., max_length=100)
     base_url: str | None = None
+    extra_config: dict | None = Field(
+        None,
+        description="Provider-specific fields: api_version (Azure), aws_region_name/aws_access_key_id/aws_secret_access_key (Bedrock), vertex_project/vertex_location/vertex_credentials (Vertex AI)",
+    )
     is_default: bool = False
     is_active: bool = True
 
@@ -25,6 +29,7 @@ class AIConfigUpdate(BaseModel):
     model_name: str | None = Field(None, max_length=100)
     api_key: str | None = Field(None, description="New API key to encrypt")
     base_url: str | None = None
+    extra_config: dict | None = None
     is_default: bool | None = None
     is_active: bool | None = None
 

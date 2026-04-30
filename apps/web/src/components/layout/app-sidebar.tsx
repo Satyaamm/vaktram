@@ -17,9 +17,21 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NAV_ITEMS } from "@/lib/constants";
+import { useAuthStore } from "@/lib/stores/auth-store";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { profile } = useAuthStore();
+
+  const displayName = profile?.full_name
+    || profile?.email?.split("@")[0]
+    || "My Account";
+
+  const avatarUrl = profile?.avatar_url || "";
+
+  const initials = displayName
+    ? displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
 
   return (
     <Sidebar collapsible="icon">
@@ -70,12 +82,12 @@ export function AppSidebar() {
             <SidebarMenuButton asChild tooltip="Profile">
               <Link href="/settings" className="flex items-center gap-2">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src="" alt="User" />
+                  <AvatarImage src={avatarUrl} alt={displayName} />
                   <AvatarFallback className="bg-teal-700 text-white text-xs">
-                    U
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
-                <span className="truncate text-sm">My Account</span>
+                <span className="truncate text-sm">{displayName}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

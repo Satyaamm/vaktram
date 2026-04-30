@@ -36,7 +36,8 @@ class ConnectionManager:
         for connection in connections:
             try:
                 await connection.send_json(message)
-            except Exception:
+            except Exception as e:
+                logger.warning("WS send failed for meeting %s: %s", meeting_id, e)
                 disconnected.append(connection)
         # Clean up dead connections
         for conn in disconnected:

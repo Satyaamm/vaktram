@@ -1,0 +1,6 @@
+apiVersion: v2
+name: vaktram
+description: Vaktram meeting-intelligence platform — API, bot, workers, web.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

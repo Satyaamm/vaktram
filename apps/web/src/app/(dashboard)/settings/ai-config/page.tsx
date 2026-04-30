@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -72,17 +73,258 @@ import {
 } from "@/components/ui/form";
 
 // ---------------------------------------------------------------------------
-// Schema
+// Provider config — what each provider needs (from their docs + LiteLLM docs)
 // ---------------------------------------------------------------------------
 
-const aiConfigSchema = z.object({
-  provider: z.string().min(1, "Please select a provider"),
-  model_name: z.string().min(1, "Model name is required"),
-  api_key: z.string().min(1, "API key is required"),
-  base_url: z.string().optional(),
-});
+interface ProviderFieldDef {
+  key: string;
+  label: string;
+  placeholder: string;
+  description: string;
+  required: boolean;
+  type: "text" | "password" | "textarea";
+  /** If true, stored in extra_config instead of top-level */
+  isExtra?: boolean;
+}
 
-type AIConfigFormValues = z.infer<typeof aiConfigSchema>;
+/** Per-provider field definitions derived from LiteLLM docs */
+function getProviderFields(provider: string): ProviderFieldDef[] {
+  switch (provider) {
+    case "openai":
+      return [
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "sk-...",
+          description: "Your OpenAI API key from platform.openai.com/api-keys",
+          required: true,
+          type: "password",
+        },
+      ];
+
+    case "anthropic":
+      return [
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "sk-ant-...",
+          description: "Your Anthropic API key from console.anthropic.com/settings/keys",
+          required: true,
+          type: "password",
+        },
+      ];
+
+    case "gemini":
+      return [
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "AI...",
+          description: "Your Google AI API key from aistudio.google.com/apikey",
+          required: true,
+          type: "password",
+        },
+      ];
+
+    case "azure":
+      // Azure OpenAI: needs endpoint, api_key, api_version, deployment name (as model)
+      return [
+        {
+          key: "base_url",
+          label: "Azure Endpoint",
+          placeholder: "https://your-resource.openai.azure.com",
+          description: "Your Azure OpenAI resource endpoint URL",
+          required: true,
+          type: "text",
+        },
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "your-azure-api-key",
+          description: "Azure OpenAI API key (found in Azure Portal > Keys and Endpoint)",
+          required: true,
+          type: "password",
+        },
+        {
+          key: "api_version",
+          label: "API Version",
+          placeholder: "2024-06-01",
+          description: "Azure OpenAI API version (e.g. 2024-06-01, 2024-02-15-preview)",
+          required: true,
+          type: "text",
+          isExtra: true,
+        },
+      ];
+
+    case "azure_ai":
+      // Azure AI Studio: needs endpoint + key
+      return [
+        {
+          key: "base_url",
+          label: "Inference Endpoint",
+          placeholder: "https://your-model-serverless.eastus2.inference.ai.azure.com",
+          description: "Your Azure AI Studio model inference endpoint URL",
+          required: true,
+          type: "text",
+        },
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "your-azure-ai-key",
+          description: "Azure AI Studio inference key",
+          required: true,
+          type: "password",
+        },
+      ];
+
+    case "bedrock":
+      // AWS Bedrock: aws_access_key_id, aws_secret_access_key, aws_region_name
+      return [
+        {
+          key: "aws_access_key_id",
+          label: "AWS Access Key ID",
+          placeholder: "AKIA...",
+          description: "Your AWS IAM access key ID with Bedrock permissions",
+          required: true,
+          type: "text",
+          isExtra: true,
+        },
+        {
+          key: "aws_secret_access_key",
+          label: "AWS Secret Access Key",
+          placeholder: "your-secret-key",
+          description: "Your AWS IAM secret access key",
+          required: true,
+          type: "password",
+          isExtra: true,
+        },
+        {
+          key: "aws_region_name",
+          label: "AWS Region",
+          placeholder: "us-east-1",
+          description: "AWS region where Bedrock is enabled (e.g. us-east-1, us-west-2)",
+          required: true,
+          type: "text",
+          isExtra: true,
+        },
+      ];
+
+    case "vertex_ai":
+      // GCP Vertex AI: vertex_project, vertex_location, vertex_credentials (JSON)
+      return [
+        {
+          key: "vertex_project",
+          label: "GCP Project ID",
+          placeholder: "my-gcp-project-12345",
+          description: "Your Google Cloud project ID",
+          required: true,
+          type: "text",
+          isExtra: true,
+        },
+        {
+          key: "vertex_location",
+          label: "Region",
+          placeholder: "us-central1",
+          description: "GCP region (e.g. us-central1, europe-west4)",
+          required: true,
+          type: "text",
+          isExtra: true,
+        },
+        {
+          key: "vertex_credentials",
+          label: "Service Account JSON",
+          placeholder: '{"type": "service_account", "project_id": "...", ...}',
+          description: "Paste the full JSON content of your GCP service account key file",
+          required: true,
+          type: "textarea",
+          isExtra: true,
+        },
+      ];
+
+    case "groq":
+      return [
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "gsk_...",
+          description: "Your Groq API key from console.groq.com/keys",
+          required: true,
+          type: "password",
+        },
+      ];
+
+    case "ollama":
+      // Ollama: just the server URL, no API key needed
+      return [
+        {
+          key: "base_url",
+          label: "Ollama Server URL",
+          placeholder: "http://localhost:11434",
+          description: "Your Ollama server URL (default: http://localhost:11434)",
+          required: true,
+          type: "text",
+        },
+      ];
+
+    case "custom":
+      // Custom OpenAI-compatible: base_url + api_key
+      return [
+        {
+          key: "base_url",
+          label: "API Base URL",
+          placeholder: "https://your-api.example.com/v1",
+          description: "Base URL of your OpenAI-compatible API endpoint",
+          required: true,
+          type: "text",
+        },
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "your-api-key",
+          description: "API key for authentication (if required)",
+          required: false,
+          type: "password",
+        },
+      ];
+
+    default:
+      return [
+        {
+          key: "api_key",
+          label: "API Key",
+          placeholder: "your-api-key",
+          description: "API key for the provider",
+          required: true,
+          type: "password",
+        },
+      ];
+  }
+}
+
+function getModelPlaceholder(provider: string): string {
+  switch (provider) {
+    case "openai": return "gpt-4o";
+    case "anthropic": return "claude-sonnet-4-20250514";
+    case "gemini": return "gemini-2.0-flash";
+    case "azure": return "your-deployment-name";
+    case "azure_ai": return "model-deployment-name";
+    case "bedrock": return "anthropic.claude-sonnet-4-20250514-v1:0";
+    case "vertex_ai": return "gemini-2.0-flash";
+    case "groq": return "llama-3.3-70b-versatile";
+    case "ollama": return "llama3";
+    case "custom": return "model-name";
+    default: return "model-name";
+  }
+}
+
+function getModelDescription(provider: string): string {
+  switch (provider) {
+    case "azure": return "Use your Azure deployment name (not the model name).";
+    case "bedrock": return "Use the full Bedrock model ID (e.g. anthropic.claude-sonnet-4-20250514-v1:0).";
+    case "vertex_ai": return "Use the Vertex AI model name (e.g. gemini-2.0-flash).";
+    default: return "Enter the model identifier for your chosen provider.";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -91,38 +333,15 @@ type AIConfigFormValues = z.infer<typeof aiConfigSchema>;
 const PROVIDER_ICONS: Record<string, typeof Cloud> = {
   openai: Cloud,
   anthropic: Brain,
-  google: Zap,
+  gemini: Zap,
   azure: Cloud,
+  azure_ai: Cloud,
+  bedrock: Cloud,
+  vertex_ai: Cloud,
+  groq: Zap,
   ollama: Server,
   custom: Server,
 };
-
-function getModelPlaceholder(provider: string): string {
-  switch (provider) {
-    case "openai":
-      return "gpt-4o";
-    case "anthropic":
-      return "claude-sonnet-4-20250514";
-    case "google":
-      return "gemini-2.0-flash";
-    case "azure":
-      return "gpt-4o (deployment name)";
-    case "ollama":
-      return "llama3";
-    case "custom":
-      return "model-name";
-    default:
-      return "model-name";
-  }
-}
-
-function showBaseUrl(provider: string): boolean {
-  return provider === "ollama" || provider === "custom" || provider === "azure";
-}
-
-// ---------------------------------------------------------------------------
-// Test Result type
-// ---------------------------------------------------------------------------
 
 interface TestResult {
   success: boolean;
@@ -143,77 +362,118 @@ function ConfigForm({
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [isTesting, setIsTesting] = useState(false);
 
-  const form = useForm<AIConfigFormValues>({
-    resolver: zodResolver(aiConfigSchema),
-    defaultValues: {
-      provider: editingConfig?.provider ?? "",
-      model_name: editingConfig?.model_name ?? "",
-      api_key: "",
-      base_url: editingConfig?.base_url ?? "",
-    },
+  // Dynamic form — we use uncontrolled state for provider-specific fields
+  const [selectedProvider, setSelectedProvider] = useState(editingConfig?.provider ?? "");
+  const [modelName, setModelName] = useState(editingConfig?.model_name ?? "");
+  // Field values keyed by field key
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() => {
+    const vals: Record<string, string> = {};
+    if (editingConfig?.base_url) vals.base_url = editingConfig.base_url;
+    if (editingConfig?.extra_config) {
+      Object.entries(editingConfig.extra_config).forEach(([k, v]) => {
+        vals[k] = v;
+      });
+    }
+    return vals;
   });
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
-  const selectedProvider = form.watch("provider");
+  const providerFields = getProviderFields(selectedProvider);
+
+  const setFieldValue = (key: string, value: string) => {
+    setFieldValues((prev) => ({ ...prev, [key]: value }));
+    setTestResult(null);
+  };
+
+  const toggleSecret = (key: string) => {
+    setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Validation
+  function validate(): string | null {
+    if (!selectedProvider) return "Please select a provider.";
+    if (!modelName.trim()) return "Model name is required.";
+    for (const field of providerFields) {
+      if (field.required && !fieldValues[field.key]?.trim()) {
+        return `${field.label} is required.`;
+      }
+    }
+    return null;
+  }
+
+  // Build payload
+  function buildPayload() {
+    const extra_config: Record<string, string> = {};
+    let api_key: string | undefined;
+    let base_url: string | undefined;
+
+    for (const field of providerFields) {
+      const val = fieldValues[field.key]?.trim();
+      if (!val) continue;
+
+      if (field.key === "api_key") {
+        api_key = val;
+      } else if (field.key === "base_url") {
+        base_url = val;
+      } else if (field.isExtra) {
+        extra_config[field.key] = val;
+      }
+    }
+
+    return {
+      provider: selectedProvider,
+      model_name: modelName.trim(),
+      api_key,
+      base_url,
+      extra_config: Object.keys(extra_config).length > 0 ? extra_config : undefined,
+    };
+  }
 
   const createMutation = useMutation({
-    mutationFn: (data: AIConfigFormValues) => createAIConfig(data),
+    mutationFn: (data: ReturnType<typeof buildPayload> & { is_default?: boolean }) =>
+      createAIConfig(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
       toast({ title: "Configuration saved", description: "Your AI config has been saved." });
-      form.reset();
-      setTestResult(null);
       onDone();
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save configuration.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to save configuration.", variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: AIConfigFormValues) =>
+    mutationFn: (data: ReturnType<typeof buildPayload>) =>
       updateAIConfig(editingConfig!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai-configs"] });
       toast({ title: "Configuration updated" });
-      form.reset();
-      setTestResult(null);
       onDone();
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update configuration.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update configuration.", variant: "destructive" });
     },
   });
 
   async function handleTest() {
-    const values = form.getValues();
-    if (!values.provider || !values.model_name || !values.api_key) {
-      toast({
-        title: "Missing fields",
-        description: "Fill in provider, model, and API key before testing.",
-        variant: "destructive",
-      });
+    const err = validate();
+    if (err) {
+      toast({ title: "Missing fields", description: err, variant: "destructive" });
       return;
     }
     setIsTesting(true);
     setTestResult(null);
     try {
+      const payload = buildPayload();
       const result = await testAIConfig({
-        provider: values.provider,
-        model_name: values.model_name,
-        api_key: values.api_key,
-        base_url: values.base_url || undefined,
+        provider: payload.provider,
+        model_name: payload.model_name,
+        api_key: payload.api_key,
+        base_url: payload.base_url,
+        extra_config: payload.extra_config,
       });
       setTestResult(result);
     } catch {
@@ -226,15 +486,18 @@ function ConfigForm({
     }
   }
 
-  function onSubmit(values: AIConfigFormValues) {
-    const payload = {
-      ...values,
-      base_url: values.base_url || undefined,
-    };
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const err = validate();
+    if (err) {
+      toast({ title: "Validation error", description: err, variant: "destructive" });
+      return;
+    }
+    const payload = buildPayload();
     if (editingConfig) {
       updateMutation.mutate(payload);
     } else {
-      createMutation.mutate(payload);
+      createMutation.mutate({ ...payload, is_default: true });
     }
   }
 
@@ -252,209 +515,182 @@ function ConfigForm({
             : "Connect a new LLM provider for AI-powered features."}
         </CardDescription>
       </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
-            {/* Provider */}
-            <FormField
-              control={form.control}
-              name="provider"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Provider</FormLabel>
-                  <Select
-                    onValueChange={(val) => {
-                      field.onChange(val);
-                      setTestResult(null);
-                    }}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a provider" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {SUPPORTED_LLM_PROVIDERS.map((provider) => {
-                        const Icon = PROVIDER_ICONS[provider.id] ?? Cloud;
-                        return (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            <span className="flex items-center gap-2">
-                              <Icon className="h-4 w-4" />
-                              {provider.name}
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Model */}
-            <FormField
-              control={form.control}
-              name="model_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Model</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={getModelPlaceholder(selectedProvider)}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Enter the model identifier for your chosen provider.
-                    {selectedProvider &&
-                      SUPPORTED_LLM_PROVIDERS.find(
-                        (p) => p.id === selectedProvider
-                      )?.models.length
-                      ? ` Suggestions: ${SUPPORTED_LLM_PROVIDERS.find(
-                          (p) => p.id === selectedProvider
-                        )!.models.join(", ")}`
-                      : ""}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* API Key */}
-            <FormField
-              control={form.control}
-              name="api_key"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>API Key</FormLabel>
-                  <div className="relative">
-                    <FormControl>
-                      <Input
-                        type={showKey ? "text" : "password"}
-                        placeholder="sk-..."
-                        className="pr-10"
-                        {...field}
-                      />
-                    </FormControl>
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowKey(!showKey)}
-                      tabIndex={-1}
-                    >
-                      {showKey ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                  <FormDescription>
-                    Your API key is encrypted at rest and never shared.
-                    {editingConfig &&
-                      " Leave blank to keep the existing key."}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Base URL (conditional) */}
-            {showBaseUrl(selectedProvider) && (
-              <FormField
-                control={form.control}
-                name="base_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Base URL{" "}
-                      <Badge variant="outline" className="ml-1 text-xs">
-                        Optional
-                      </Badge>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={
-                          selectedProvider === "ollama"
-                            ? "http://localhost:11434/v1"
-                            : "https://api.openai.com/v1"
-                        }
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Override the API base URL for custom endpoints or local
-                      models.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Test result */}
-            {testResult && (
-              <div
-                className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${
-                  testResult.success
-                    ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200"
-                    : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-                }`}
-              >
-                {testResult.success ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                ) : (
-                  <XCircle className="h-4 w-4 shrink-0" />
-                )}
-                <span>
-                  {testResult.message}
-                  {testResult.success && testResult.response_time_ms != null && (
-                    <span className="ml-1 text-xs opacity-75">
-                      ({testResult.response_time_ms}ms)
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-          </CardContent>
-
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              onClick={handleTest}
-              disabled={isTesting}
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-4">
+          {/* Provider Select */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Provider</label>
+            <Select
+              value={selectedProvider}
+              onValueChange={(val) => {
+                setSelectedProvider(val);
+                setFieldValues({});
+                setTestResult(null);
+              }}
             >
-              {isTesting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4" />
-              )}
-              Test Connection
-            </Button>
-            <div className="flex gap-2">
-              {editingConfig && (
-                <Button type="button" variant="outline" onClick={onDone}>
-                  Cancel
-                </Button>
-              )}
-              <Button
-                type="submit"
-                className="bg-teal-700 hover:bg-teal-800 text-white"
-                disabled={isSaving}
-              >
-                {isSaving && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {editingConfig ? "Update Configuration" : "Save Configuration"}
-              </Button>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_LLM_PROVIDERS.map((provider) => {
+                  const Icon = PROVIDER_ICONS[provider.id] ?? Cloud;
+                  return (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      <span className="flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        {provider.name}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Model Name */}
+          {selectedProvider && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                {selectedProvider === "azure" ? "Deployment Name" : "Model"}
+              </label>
+              <Input
+                value={modelName}
+                onChange={(e) => {
+                  setModelName(e.target.value);
+                  setTestResult(null);
+                }}
+                placeholder={getModelPlaceholder(selectedProvider)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {getModelDescription(selectedProvider)}
+                {SUPPORTED_LLM_PROVIDERS.find((p) => p.id === selectedProvider)?.models.length
+                  ? ` Suggestions: ${SUPPORTED_LLM_PROVIDERS.find(
+                      (p) => p.id === selectedProvider
+                    )!.models.join(", ")}`
+                  : ""}
+              </p>
             </div>
-          </CardFooter>
-        </form>
-      </Form>
+          )}
+
+          {/* Provider-specific fields */}
+          {selectedProvider &&
+            providerFields.map((field) => (
+              <div key={field.key} className="space-y-2">
+                <label className="text-sm font-medium">
+                  {field.label}
+                  {!field.required && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      Optional
+                    </Badge>
+                  )}
+                </label>
+                {field.type === "textarea" ? (
+                  <Textarea
+                    value={fieldValues[field.key] ?? ""}
+                    onChange={(e) => setFieldValue(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    rows={4}
+                    className="font-mono text-xs"
+                  />
+                ) : (
+                  <div className="relative">
+                    <Input
+                      type={
+                        field.type === "password" && !showSecrets[field.key]
+                          ? "password"
+                          : "text"
+                      }
+                      value={fieldValues[field.key] ?? ""}
+                      onChange={(e) => setFieldValue(field.key, e.target.value)}
+                      placeholder={
+                        editingConfig && field.key === "api_key"
+                          ? "Leave blank to keep existing key"
+                          : field.placeholder
+                      }
+                      className={field.type === "password" ? "pr-10" : ""}
+                    />
+                    {field.type === "password" && (
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => toggleSecret(field.key)}
+                        tabIndex={-1}
+                      >
+                        {showSecrets[field.key] ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {editingConfig && field.key === "api_key"
+                    ? `${field.description}. Leave blank to keep the existing key.`
+                    : field.description}
+                </p>
+              </div>
+            ))}
+
+          {/* Test result */}
+          {testResult && (
+            <div
+              className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${
+                testResult.success
+                  ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200"
+                  : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+              }`}
+            >
+              {testResult.success ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              ) : (
+                <XCircle className="h-4 w-4 shrink-0" />
+              )}
+              <span>
+                {testResult.message}
+                {testResult.success && testResult.response_time_ms != null && (
+                  <span className="ml-1 text-xs opacity-75">
+                    ({testResult.response_time_ms}ms)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+        </CardContent>
+
+        <CardFooter className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={handleTest}
+            disabled={isTesting || !selectedProvider}
+          >
+            {isTesting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            Test Connection
+          </Button>
+          <div className="flex gap-2">
+            {editingConfig && (
+              <Button type="button" variant="outline" onClick={onDone}>
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="submit"
+              className="bg-teal-700 hover:bg-teal-800 text-white"
+              disabled={isSaving || !selectedProvider}
+            >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingConfig ? "Update Configuration" : "Save Configuration"}
+            </Button>
+          </div>
+        </CardFooter>
+      </form>
     </Card>
   );
 }
@@ -484,11 +720,7 @@ function SavedConfigsList({
       setDeleteTarget(null);
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete configuration.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete configuration.", variant: "destructive" });
     },
   });
 
@@ -499,11 +731,7 @@ function SavedConfigsList({
       toast({ title: "Default provider updated" });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to set default.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to set default.", variant: "destructive" });
     },
   });
 
@@ -569,13 +797,15 @@ function SavedConfigsList({
                         </div>
                         <p className="text-xs text-muted-foreground">
                           Added{" "}
-                          {new Date(config.created_at).toLocaleDateString(
-                            "en-US",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }
+                          {new Date(config.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                          {config.base_url && (
+                            <span className="ml-2 text-muted-foreground/60">
+                              {config.base_url}
+                            </span>
                           )}
                         </p>
                       </div>
@@ -690,13 +920,16 @@ export default function AIConfigPage() {
         </div>
       </div>
 
-      {/* Free tier note */}
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
-        <p className="text-sm text-amber-800 dark:text-amber-200">
-          <strong>Note:</strong> Free tier uses Gemini 2.0 Flash by default.
-          Upgrade to Pro or add your own API key for full BYOM support.
-        </p>
-      </div>
+      {/* BYOM required notice */}
+      {configs.length === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            <strong>Required:</strong> You must configure an AI model to use
+            meeting summaries, action items, and insights. Add your provider
+            credentials below to get started.
+          </p>
+        </div>
+      )}
 
       {/* Add / Edit form */}
       {showForm || editingConfig ? (

@@ -17,7 +17,15 @@ import {
   Loader2,
   Upload,
   RefreshCw,
+  Shield,
+  Archive,
+  ArrowUpRight,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
+
+import { billingApi, type PlanTier } from "@/lib/api/billing";
+import { complianceApi } from "@/lib/api/compliance";
 
 import {
   getProfile,
@@ -27,10 +35,12 @@ import {
   authorizeCalendar,
   syncCalendar,
   disconnectCalendar,
+  getUsage,
 } from "@/lib/api/settings";
 import { PLAN_LIMITS } from "@/lib/constants";
 import type { UserProfile, UserAIConfig } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthStore, type BackendProfile } from "@/lib/stores/auth-store";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -126,15 +136,20 @@ function ProfileTab() {
     resolver: zodResolver(profileSchema),
     values: {
       full_name: profile?.full_name ?? "",
-      timezone: "UTC",
-      language: "en",
+      timezone: profile?.timezone ?? "UTC",
+      language: profile?.language ?? "en",
     },
   });
 
   const mutation = useMutation({
     mutationFn: (data: ProfileFormValues) => updateProfile(data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      // Sync the auth store so header/sidebar reflect changes immediately
+      try {
+        const updated = await getProfile();
+        useAuthStore.getState().setProfile(updated as unknown as BackendProfile);
+      } catch { /* ignore */ }
       toast({ title: "Profile updated", description: "Your changes have been saved." });
     },
     onError: () => {
@@ -192,12 +207,12 @@ function ProfileTab() {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <Button type="button" variant="outline" size="sm" className="gap-2">
+                <Button type="button" variant="outline" size="sm" className="gap-2" disabled>
                   <Upload className="h-4 w-4" />
                   Upload Photo
                 </Button>
                 <p className="text-xs text-muted-foreground mt-1">
-                  JPG, PNG or GIF. Max 2MB.
+                  Coming soon. JPG, PNG or GIF. Max 2MB.
                 </p>
               </div>
             </div>
@@ -633,140 +648,469 @@ function NotificationsTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Billing Tab
+// Billing Tab — real subscription + Stripe checkout/portal
 // ---------------------------------------------------------------------------
 
+function formatUsage(kind: string, used: number): string {
+  if (kind === "transcription_minutes" || kind === "bot_minutes") {
+    const h = Math.floor(used / 60);
+    const m = used % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  if (kind === "llm_input_tokens" || kind === "llm_output_tokens") {
+    if (used >= 1_000_000) return `${(used / 1_000_000).toFixed(1)}M tokens`;
+    if (used >= 1_000) return `${(used / 1_000).toFixed(1)}k tokens`;
+    return `${used} tokens`;
+  }
+  return String(used);
+}
+
+function humanizeKind(kind: string): string {
+  return kind.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function BillingTab() {
-  const { isLoading } = useQuery<UserProfile>({
-    queryKey: ["profile"],
-    queryFn: getProfile,
+  const { toast } = useToast();
+  const { data: subscription, isLoading: subLoading } = useQuery({
+    queryKey: ["subscription"],
+    queryFn: billingApi.subscription,
+    retry: 1,
+  });
+  const { data: usage, isLoading: usageLoading } = useQuery({
+    queryKey: ["billing-usage"],
+    queryFn: billingApi.usage,
+    retry: 1,
+  });
+  const { data: plans } = useQuery({
+    queryKey: ["billing-plans"],
+    queryFn: billingApi.plans,
   });
 
-  const plan = "free" as const; // TODO: fetch from billing endpoint
-  const planInfo = PLAN_LIMITS[plan];
+  const checkout = useMutation({
+    mutationFn: (plan: PlanTier) => {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      return billingApi.checkout({
+        plan,
+        seats: 1,
+        success_url: `${origin}/settings?status=upgraded`,
+        cancel_url: `${origin}/settings`,
+      });
+    },
+    onSuccess: ({ url }) => {
+      window.location.href = url;
+    },
+    onError: (e: Error) => {
+      toast({
+        title: "Checkout unavailable",
+        description: e.message || "Stripe is not configured yet.",
+        variant: "destructive",
+      });
+    },
+  });
 
-  // Mock usage data (would come from API in production)
-  const meetingsUsed = 23;
-  const storageMb = 2100;
-  const meetingsLimit: number = planInfo.meetingsPerMonth;
-  const storageLimit: number = planInfo.storageMb;
-  const meetingsPercent =
-    meetingsLimit === -1 ? 0 : Math.round((meetingsUsed / meetingsLimit) * 100);
-  const storagePercent =
-    storageLimit === -1 ? 0 : Math.round((storageMb / storageLimit) * 100);
+  const portal = useMutation({
+    mutationFn: () => {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      return billingApi.portal(`${origin}/settings`);
+    },
+    onSuccess: ({ url }) => {
+      window.location.href = url;
+    },
+    onError: (e: Error) => {
+      toast({
+        title: "Portal unavailable",
+        description: e.message,
+        variant: "destructive",
+      });
+    },
+  });
 
-  if (isLoading) {
+  if (subLoading || usageLoading) {
     return (
       <Card>
         <CardHeader>
           <Skeleton className="h-6 w-24" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-24 w-full" />
           <Skeleton className="h-16 w-full" />
         </CardContent>
       </Card>
     );
   }
 
+  const plan = subscription?.plan ?? "free";
+  const planInfo = plans?.[plan];
+  const periodEnd = subscription?.current_period_end
+    ? new Date(subscription.current_period_end).toLocaleDateString()
+    : null;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Billing</CardTitle>
-        <CardDescription>
-          Manage your subscription and billing details.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Current plan */}
-        <div className="rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Current Plan</p>
-              <p className="text-2xl font-bold text-teal-700 dark:text-teal-500">
-                {planInfo.name}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {planInfo.price === 0
-                  ? "Free forever"
-                  : planInfo.price === -1
-                    ? "Custom pricing"
-                    : `$${planInfo.price}/month`}
-              </p>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Subscription</CardTitle>
+          <CardDescription>
+            Manage your plan and billing details. Powered by Stripe.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Current plan</p>
+                <p className="text-2xl font-bold text-teal-700 capitalize">
+                  {planInfo?.name ?? plan}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {subscription?.status === "trialing" && "Trial · "}
+                  {subscription?.seats ?? 1} seat
+                  {(subscription?.seats ?? 1) === 1 ? "" : "s"}
+                  {periodEnd && ` · renews ${periodEnd}`}
+                  {subscription?.cancel_at_period_end && " · cancels at period end"}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => portal.mutate()}
+                  disabled={portal.isPending}
+                >
+                  {portal.isPending && (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  )}
+                  Manage subscription
+                </Button>
+              </div>
             </div>
-            {(plan === "free" || plan === "pro") && (
-              <Button variant="outline">Upgrade Plan</Button>
+
+            {planInfo && (
+              <>
+                <Separator className="my-3" />
+                <ul className="space-y-1">
+                  {planInfo.features.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                    >
+                      <Check className="h-3 w-3 text-teal-700" /> {f}
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
 
-          <Separator className="my-3" />
+          {plan !== "enterprise" && plans && (
+            <div className="grid gap-3 md:grid-cols-3">
+              {(["pro", "team", "business"] as PlanTier[])
+                .filter((t) => t !== plan)
+                .map((tier) => {
+                  const p = plans[tier];
+                  if (!p) return null;
+                  return (
+                    <Card key={tier} className="p-4">
+                      <p className="font-semibold">{p.name}</p>
+                      <p className="text-xl font-bold mt-1">
+                        ${(p.monthly_price_cents / 100).toFixed(0)}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          /seat/mo
+                        </span>
+                      </p>
+                      <Button
+                        size="sm"
+                        className="mt-3 w-full bg-teal-700 hover:bg-teal-800 text-white"
+                        onClick={() => checkout.mutate(tier)}
+                        disabled={checkout.isPending}
+                      >
+                        {checkout.isPending && (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        )}
+                        Upgrade <ArrowUpRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </Card>
+                  );
+                })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Plan features
-            </p>
-            <ul className="space-y-1">
-              {planInfo.features.map((feature) => (
-                <li
-                  key={feature}
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                >
-                  <Check className="h-3 w-3 text-teal-700" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
+      <Card>
+        <CardHeader>
+          <CardTitle>Usage this period</CardTitle>
+          <CardDescription>
+            Resets on{" "}
+            {usage?.period_start
+              ? new Date(usage.period_start).toLocaleDateString()
+              : "the 1st"}
+            . Live counters from the pipeline.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {usage?.entries.map((e) => {
+            const unlimited = e.limit === 0;
+            const pct = unlimited
+              ? 5
+              : Math.min(100, Math.round((e.used / e.limit) * 100));
+            return (
+              <div key={e.kind}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">
+                    {humanizeKind(e.kind)}
+                  </span>
+                  <span>
+                    {formatUsage(e.kind, e.used)}{" "}
+                    <span className="text-muted-foreground">
+                      {unlimited ? "(unlimited)" : `/ ${formatUsage(e.kind, e.limit)}`}
+                    </span>
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      pct >= 90
+                        ? "bg-red-600"
+                        : pct >= 75
+                          ? "bg-amber-500"
+                          : "bg-teal-700"
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Audit Log Tab
+// ---------------------------------------------------------------------------
+
+function AuditTab() {
+  const { data: rows, isLoading } = useQuery({
+    queryKey: ["audit"],
+    queryFn: () => complianceApi.listAudit(200),
+    retry: 1,
+  });
+
+  const verify = useMutation({ mutationFn: complianceApi.verifyChain });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle>Audit log</CardTitle>
+          <CardDescription>
+            Hash-chained, tamper-evident record of every privileged action.
+            SOC 2 evidence comes from this.
+          </CardDescription>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => verify.mutate()}
+          disabled={verify.isPending}
+        >
+          {verify.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+          ) : verify.data?.ok === true ? (
+            <ShieldCheck className="h-4 w-4 mr-1 text-green-600" />
+          ) : verify.data?.ok === false ? (
+            <ShieldAlert className="h-4 w-4 mr-1 text-red-600" />
+          ) : (
+            <Shield className="h-4 w-4 mr-1" />
+          )}
+          Verify chain
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {verify.data && (
+          <p className="text-sm mb-3">
+            Checked {verify.data.checked} entries —{" "}
+            {verify.data.ok ? (
+              <span className="text-green-700">chain intact ✓</span>
+            ) : (
+              <span className="text-red-700">
+                {verify.data.breaks.length} break(s): {verify.data.breaks.join(", ")}
+              </span>
+            )}
+          </p>
+        )}
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </div>
+        ) : !rows || rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No audit entries yet.</p>
+        ) : (
+          <div className="rounded-md border max-h-[60vh] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 sticky top-0">
+                <tr>
+                  <th className="text-left p-2 font-medium">Time</th>
+                  <th className="text-left p-2 font-medium">Action</th>
+                  <th className="text-left p-2 font-medium">Resource</th>
+                  <th className="text-left p-2 font-medium">User</th>
+                  <th className="text-left p-2 font-medium">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-t hover:bg-muted/20">
+                    <td className="p-2 font-mono text-xs">
+                      {new Date(r.ts).toLocaleString()}
+                    </td>
+                    <td className="p-2">
+                      <Badge variant="outline">{r.action}</Badge>
+                    </td>
+                    <td className="p-2 text-xs">
+                      {r.resource_type}
+                      {r.resource_id ? ` · ${r.resource_id.slice(0, 8)}` : ""}
+                    </td>
+                    <td className="p-2 text-xs">
+                      {r.user_id ? r.user_id.slice(0, 8) : "—"}
+                    </td>
+                    <td className="p-2 text-xs">{r.ip ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Retention Tab
+// ---------------------------------------------------------------------------
+
+function RetentionTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["retention"],
+    queryFn: complianceApi.getRetention,
+    retry: 1,
+  });
+
+  const [defaultDays, setDefaultDays] = useState<number>(365);
+  const [legalHold, setLegalHold] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (data) {
+      setDefaultDays(data.default_days ?? 365);
+      setLegalHold(data.legal_hold ?? false);
+    }
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      complianceApi.putRetention({
+        default_days: defaultDays,
+        legal_hold: legalHold,
+      }),
+    onSuccess: () => {
+      toast({ title: "Retention policy saved" });
+      queryClient.invalidateQueries({ queryKey: ["retention"] });
+    },
+    onError: (e: Error) =>
+      toast({
+        title: "Save failed",
+        description: e.message,
+        variant: "destructive",
+      }),
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-32" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-24 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const presets = [
+    { label: "30 days", value: 30 },
+    { label: "90 days", value: 90 },
+    { label: "1 year", value: 365 },
+    { label: "Forever", value: 36500 },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Data retention</CardTitle>
+        <CardDescription>
+          How long Vaktram keeps your meeting recordings, transcripts, and
+          summaries. A daily worker purges everything older than this — except
+          meetings under legal hold.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <Label>Retain everything for</Label>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {presets.map((p) => (
+              <Button
+                key={p.value}
+                size="sm"
+                variant={defaultDays === p.value ? "default" : "outline"}
+                className={
+                  defaultDays === p.value
+                    ? "bg-teal-700 hover:bg-teal-800 text-white"
+                    : ""
+                }
+                onClick={() => setDefaultDays(p.value)}
+              >
+                {p.label}
+              </Button>
+            ))}
+            <Input
+              type="number"
+              min={1}
+              value={defaultDays}
+              onChange={(e) => setDefaultDays(Number(e.target.value) || 0)}
+              className="w-32"
+            />
+            <span className="self-center text-sm text-muted-foreground">days</span>
           </div>
         </div>
 
-        <Separator />
-
-        {/* Usage */}
-        <div>
-          <p className="text-sm font-medium mb-3">Usage This Month</p>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Meetings</span>
-                <span>
-                  {meetingsUsed}{" "}
-                  {meetingsLimit === -1
-                    ? "(unlimited)"
-                    : `/ ${meetingsLimit}`}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted">
-                <div
-                  className="h-2 rounded-full bg-teal-700 dark:bg-teal-500 transition-all"
-                  style={{
-                    width: `${meetingsLimit === -1 ? 10 : meetingsPercent}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Storage</span>
-                <span>
-                  {(storageMb / 1000).toFixed(1)} GB{" "}
-                  {storageLimit === -1
-                    ? "(unlimited)"
-                    : `/ ${(storageLimit / 1000).toFixed(0)} GB`}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted">
-                <div
-                  className="h-2 rounded-full bg-teal-700 dark:bg-teal-500 transition-all"
-                  style={{
-                    width: `${storageLimit === -1 ? 5 : storagePercent}%`,
-                  }}
-                />
-              </div>
-            </div>
+        <div className="flex items-start justify-between">
+          <div className="space-y-0.5">
+            <Label>Legal hold</Label>
+            <p className="text-xs text-muted-foreground">
+              When enabled, no data is purged regardless of the retention setting.
+              Use during audits or active litigation.
+            </p>
           </div>
+          <Switch checked={legalHold} onCheckedChange={setLegalHold} />
         </div>
       </CardContent>
+      <CardFooter>
+        <Button
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+          className="bg-teal-700 hover:bg-teal-800 text-white"
+        >
+          {save.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+          Save policy
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
@@ -807,6 +1151,14 @@ export default function SettingsPage() {
             <CreditCard className="h-4 w-4" />
             Billing
           </TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2">
+            <Shield className="h-4 w-4" />
+            Audit log
+          </TabsTrigger>
+          <TabsTrigger value="retention" className="gap-2">
+            <Archive className="h-4 w-4" />
+            Retention
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -827,6 +1179,14 @@ export default function SettingsPage() {
 
         <TabsContent value="billing">
           <BillingTab />
+        </TabsContent>
+
+        <TabsContent value="audit">
+          <AuditTab />
+        </TabsContent>
+
+        <TabsContent value="retention">
+          <RetentionTab />
         </TabsContent>
       </Tabs>
     </div>

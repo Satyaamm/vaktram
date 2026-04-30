@@ -1,0 +1,42 @@
+# Fly.io config for the Vaktram API.
+# Deploy:  fly launch --config infra/fly/fly.api.toml
+# Update:  fly deploy --config infra/fly/fly.api.toml
+
+app = "vaktram-api"
+primary_region = "iad"
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "../../infra/docker/Dockerfile.api"
+
+[env]
+  ENVIRONMENT = "production"
+  PORT = "8000"
+  REGION = "us-east-1"
+  STORAGE_BUCKET = "vaktram-audio"
+  API_BASE_URL = "https://api.vaktram.com"
+  FRONTEND_BASE_URL = "https://app.vaktram.com"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

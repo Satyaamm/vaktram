@@ -16,7 +16,7 @@ engine = create_async_engine(
     max_overflow=settings.database_max_overflow,
     echo=settings.debug,
     pool_pre_ping=True,
-    connect_args={"server_settings": {"search_path": "vaktram,public"}},
+    connect_args={"server_settings": {"search_path": "vaktram"}},
 )
 
 async_session_factory = async_sessionmaker(

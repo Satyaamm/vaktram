@@ -1,0 +1,69 @@
+{{- /*
+   Bot service. Each pod runs a single Playwright/PulseAudio worker per
+   meeting. Privileged is needed for /dev/shm + audio devices in some
+   clusters; remove if your runtime supports unprivileged audio capture.
+*/ -}}
+{{- $name := printf "%s-bot" .Release.Name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: { app: vaktram-bot, release: {{ .Release.Name }} }
+spec:
+  replicas: {{ .Values.bot.replicas }}
+  selector:
+    matchLabels: { app: vaktram-bot, release: {{ .Release.Name }} }
+  template:
+    metadata:
+      labels: { app: vaktram-bot, release: {{ .Release.Name }} }
+    spec:
+      containers:
+        - name: bot
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.bot.image }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.pullPolicy }}
+          ports: [ { containerPort: 8001 } ]
+          envFrom:
+            - secretRef: { name: {{ .Release.Name }}-env }
+          env:
+            - { name: API_URL, value: "http://{{ .Release.Name }}-api" }
+            - { name: REGION, value: {{ .Values.global.region | quote }} }
+          readinessProbe:
+            httpGet: { path: /health, port: 8001 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: { path: /health, port: 8001 }
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          securityContext:
+            # PulseAudio in-container needs SHM. Keep privileged off; mount
+            # a tmpfs for shared memory instead.
+            privileged: false
+          resources: {{- toYaml .Values.bot.resources | nindent 12 }}
+          volumeMounts:
+            - { name: dshm, mountPath: /dev/shm }
+      volumes:
+        - name: dshm
+          emptyDir: { medium: Memory, sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  selector: { app: vaktram-bot, release: {{ .Release.Name }} }
+  ports:
+    - { name: http, port: 8001, targetPort: 8001 }
+{{- if .Values.bot.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ $name }} }
+  minReplicas: {{ .Values.bot.hpa.minReplicas }}
+  maxReplicas: {{ .Values.bot.hpa.maxReplicas }}
+  metrics:
+    {{- toYaml .Values.bot.hpa.metrics | nindent 4 }}
+{{- end }}

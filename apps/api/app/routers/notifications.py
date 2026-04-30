@@ -30,7 +30,7 @@ async def list_notifications(
     return result.scalars().all()
 
 
-@router.patch("/{notification_id}/read")
+@router.patch("/{notification_id}/read", response_model=NotificationRead)
 async def mark_read(
     notification_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -48,10 +48,11 @@ async def mark_read(
         raise HTTPException(status_code=404, detail="Notification not found")
     notif.is_read = True
     await db.flush()
-    return {"status": "ok"}
+    await db.refresh(notif)
+    return notif
 
 
-@router.post("/read-all")
+@router.post("/read-all", status_code=status.HTTP_200_OK)
 async def mark_all_read(
     db: AsyncSession = Depends(get_db),
     user: UserProfile = Depends(get_current_user),
@@ -59,8 +60,8 @@ async def mark_all_read(
     """Mark all notifications as read."""
     await db.execute(
         update(Notification)
-        .where(Notification.user_id == user.id, Notification.is_read == False)
+        .where(Notification.user_id == user.id, Notification.is_read == False)  # noqa: E712
         .values(is_read=True)
     )
     await db.flush()
-    return {"status": "ok"}
+    return {"status": "ok", "message": "All notifications marked as read"}

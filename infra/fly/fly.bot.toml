@@ -1,0 +1,35 @@
+# Fly.io config for the Vaktram bot service.
+# One Machine per concurrent meeting, scales to zero when idle so we only pay
+# for actual meeting time.
+
+app = "vaktram-bot"
+primary_region = "iad"
+
+[build]
+  dockerfile = "../../infra/docker/Dockerfile.bot"
+
+[env]
+  PORT = "8001"
+  HEADLESS = "true"
+  PULSE_SERVER = "unix:/tmp/pulseaudio.socket"
+  BOT_MAX_DURATION_SEC = "10800"
+  BOT_END_CHECK_INTERVAL_SEC = "10"
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = "stop"     # idle machines power down
+  auto_start_machines = true       # restart on /bots/start
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "30s"             # PulseAudio takes a few seconds to come up
+  method = "GET"
+  path = "/health"
+
+[[vm]]
+  size = "performance-2x"          # Playwright + PulseAudio + FFmpeg need RAM
+  memory = "2gb"

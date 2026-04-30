@@ -124,10 +124,9 @@ cd apps/web
   Runs on http://localhost:8000
 
   You'll need a .env file in apps/api/ with:
-  SUPABASE_DB_URL=postgresql://postgres:password@db.epdymcjwgnuoojoniqwp.supabase.co:5432/postgres
-  SUPABASE_JWT_SECRET=<your-jwt-secret-from-supabase-dashboard>
-  GOOGLE_AI_API_KEY=<your-gemini-key>
-  ENCRYPTION_KEY=<32-byte-key>
+  DATABASE_URL=postgresql+asyncpg://postgres:password@db.<project>.supabase.co:5432/postgres
+  JWT_SECRET=<random-string-32-chars-or-longer>
+  ENCRYPTION_KEY=<32-byte-fernet-key>
 
   Get the JWT secret from: Supabase Dashboard → Settings → API → JWT Secret
 

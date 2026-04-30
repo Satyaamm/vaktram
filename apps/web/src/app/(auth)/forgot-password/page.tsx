@@ -13,16 +13,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
 import { Loader2, ArrowLeft, Mail } from "lucide-react";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-
-  const supabase = createClient();
 
   const handleResetRequest = async () => {
     if (!email.trim()) {
@@ -33,14 +32,14 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        }
-      );
-      if (error) {
-        setError(error.message);
+      const res = await fetch(`${API_BASE}/api/v1/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err.detail || "Something went wrong.");
       } else {
         setSent(true);
       }
@@ -60,8 +59,9 @@ export default function ForgotPasswordPage() {
           </div>
           <CardTitle className="text-xl font-bold">Check your email</CardTitle>
           <CardDescription className="mt-2">
-            We sent a password reset link to{" "}
-            <span className="font-medium text-foreground">{email}</span>.
+            If an account exists for{" "}
+            <span className="font-medium text-foreground">{email}</span>, we
+            sent a password reset link.
           </CardDescription>
         </CardHeader>
         <CardFooter className="justify-center pb-6">

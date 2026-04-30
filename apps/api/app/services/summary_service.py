@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 
 from fastapi import HTTPException
@@ -13,7 +14,20 @@ from app.models.meeting import Meeting
 from app.models.summary import MeetingSummary
 from app.models.team import UserProfile
 from app.models.transcript import TranscriptSegment
-from app.services.llm_service import LLMService
+from app.services.encryption_service import EncryptionService
+from app.services.llm_service import LLMRequest, call_llm
+
+encryption = EncryptionService()
+
+SUMMARY_PROMPT = """You are an expert meeting summarizer. Given a meeting transcript, produce a structured JSON response with:
+
+1. "summary_text": A concise, well-structured summary (2-4 paragraphs).
+2. "action_items": A list of objects with "description", "assignee" (if mentioned), and "due_date" (if mentioned).
+3. "key_decisions": A list of objects with "decision" and "context".
+4. "topics": A list of main topics discussed.
+5. "sentiment": The overall meeting sentiment (positive, neutral, negative, mixed).
+
+Respond ONLY with valid JSON."""
 
 
 class SummaryService:
@@ -54,29 +68,68 @@ class SummaryService:
         if not segments:
             raise HTTPException(status_code=400, detail="No transcript available for this meeting")
 
-        # Resolve LLM config
-        if not provider or not model:
+        # Resolve LLM config from user's BYOM settings
+        config_result = await self.db.execute(
+            select(UserAIConfig).where(
+                UserAIConfig.user_id == user.id,
+                UserAIConfig.is_active.is_(True),
+                UserAIConfig.is_default.is_(True),
+            )
+        )
+        ai_config = config_result.scalar_one_or_none()
+        if not ai_config:
+            # Fallback to any active config
             config_result = await self.db.execute(
                 select(UserAIConfig).where(
-                    UserAIConfig.user_id == user.id, UserAIConfig.is_default.is_(True)
-                )
+                    UserAIConfig.user_id == user.id,
+                    UserAIConfig.is_active.is_(True),
+                ).limit(1)
             )
-            default_config = config_result.scalar_one_or_none()
-            if default_config:
-                provider = provider or default_config.provider
-                model = model or default_config.model_name
+            ai_config = config_result.scalar_one_or_none()
 
-        llm = LLMService()
+        if not ai_config:
+            raise HTTPException(
+                status_code=400,
+                detail="No AI model configured. Go to Settings > AI Config to add your provider.",
+            )
+
+        # Use override provider/model if provided, otherwise use config
+        resolved_provider = provider or ai_config.provider
+        resolved_model = model or ai_config.model_name
+        api_key = encryption.decrypt(ai_config.api_key_encrypted) if ai_config.api_key_encrypted else ""
+
         transcript_text = "\n".join(
             f"[{s.speaker_name}] ({s.start_time:.1f}s): {s.content}" for s in segments
         )
-        result = await llm.generate_summary(
-            transcript=transcript_text,
-            provider=provider,
-            model=model,
-            custom_prompt=custom_prompt,
-            user=user,
+
+        prompt = custom_prompt or SUMMARY_PROMPT
+
+        req = LLMRequest(
+            provider=resolved_provider,
+            model_name=resolved_model,
+            api_key=api_key,
+            base_url=ai_config.base_url,
+            extra_config=ai_config.extra_config,
+            system_prompt=prompt,
+            user_prompt=transcript_text,
+            temperature=0.3,
+            max_tokens=4096,
         )
+
+        raw = await call_llm(req)
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            result = {
+                "summary_text": raw,
+                "action_items": [],
+                "key_decisions": [],
+                "topics": [],
+                "sentiment": "unknown",
+            }
+
+        model_string = f"{resolved_provider}/{resolved_model}"
 
         # Upsert summary
         existing = await self.get_summary(meeting_id, user.id)
@@ -86,8 +139,8 @@ class SummaryService:
             existing.key_decisions = result.get("key_decisions")
             existing.topics = result.get("topics")
             existing.sentiment = result.get("sentiment")
-            existing.model_used = model
-            existing.provider_used = provider
+            existing.model_used = model_string
+            existing.provider_used = resolved_provider
             await self.db.flush()
             await self.db.refresh(existing)
             return existing
@@ -99,8 +152,8 @@ class SummaryService:
             key_decisions=result.get("key_decisions"),
             topics=result.get("topics"),
             sentiment=result.get("sentiment"),
-            model_used=model,
-            provider_used=provider,
+            model_used=model_string,
+            provider_used=resolved_provider,
         )
         self.db.add(summary)
         await self.db.flush()
@@ -108,7 +161,6 @@ class SummaryService:
         return summary
 
     async def delete_summary(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
-        # Verify ownership through join
         existing = await self.get_summary(meeting_id, user_id)
         if existing is None:
             return False

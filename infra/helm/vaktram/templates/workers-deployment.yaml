@@ -1,0 +1,51 @@
+{{- /*
+   Pipeline workers: transcribe (CPU, I/O bound), summarize (CPU, calls LLM),
+   diarize (GPU, pyannote). Each is a separate Deployment + HPA so they scale
+   independently with their queues.
+*/ -}}
+{{- range $worker, $cfg := dict "transcribe" .Values.workerTranscribe "summarize" .Values.workerSummarize "diarize" .Values.workerDiarize }}
+{{- $name := printf "%s-worker-%s" $.Release.Name $worker }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: { app: vaktram-worker, worker: {{ $worker }}, release: {{ $.Release.Name }} }
+spec:
+  replicas: {{ $cfg.replicas }}
+  selector:
+    matchLabels: { app: vaktram-worker, worker: {{ $worker }}, release: {{ $.Release.Name }} }
+  template:
+    metadata:
+      labels: { app: vaktram-worker, worker: {{ $worker }}, release: {{ $.Release.Name }} }
+    spec:
+      {{- with $cfg.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: "{{ $.Values.global.imageRegistry }}/{{ $cfg.image }}:{{ $.Values.global.imageTag }}"
+          imagePullPolicy: {{ $.Values.global.pullPolicy }}
+          envFrom:
+            - secretRef: { name: {{ $.Release.Name }}-env }
+          env:
+            - { name: WORKER_KIND, value: {{ $worker | quote }} }
+            - { name: API_URL, value: "http://{{ $.Release.Name }}-api" }
+          resources: {{- toYaml $cfg.resources | nindent 12 }}
+{{- if $cfg.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ $name }} }
+  minReplicas: {{ $cfg.hpa.minReplicas }}
+  maxReplicas: {{ $cfg.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+{{- end }}
+{{- end }}

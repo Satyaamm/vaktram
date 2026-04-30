@@ -5,15 +5,22 @@ import {
   BarChart3,
   Settings,
   Users,
+  Sparkles,
+  Hash,
+  MessagesSquare,
 } from "lucide-react";
 
 export const APP_NAME = "Vaktram";
 
 export const SUPPORTED_LLM_PROVIDERS = [
-  { id: "openai", name: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"] },
-  { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-4-20250514", "claude-haiku-35-20241022"] },
-  { id: "google", name: "Google AI", models: ["gemini-2.0-flash", "gemini-2.5-pro"] },
-  { id: "azure", name: "Azure OpenAI", models: [] },
+  { id: "openai", name: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1-mini"] },
+  { id: "anthropic", name: "Anthropic (Claude)", models: ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001", "claude-opus-4-20250514"] },
+  { id: "gemini", name: "Google Gemini", models: ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"] },
+  { id: "azure", name: "Azure OpenAI", models: ["gpt-4o", "gpt-4o-mini"] },
+  { id: "azure_ai", name: "Azure AI Studio", models: [] },
+  { id: "bedrock", name: "AWS Bedrock", models: ["anthropic.claude-sonnet-4-20250514-v1:0", "anthropic.claude-haiku-4-5-20251001-v1:0"] },
+  { id: "vertex_ai", name: "GCP Vertex AI", models: ["gemini-2.0-flash", "gemini-2.5-pro"] },
+  { id: "groq", name: "Groq", models: ["llama-3.3-70b-versatile", "mixtral-8x7b-32768"] },
   { id: "ollama", name: "Ollama (Local)", models: ["llama3", "mistral", "mixtral"] },
   { id: "custom", name: "Custom / OpenAI-compatible", models: [] },
 ] as const;
@@ -76,6 +83,9 @@ export const PLAN_LIMITS = {
 export const NAV_ITEMS = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Meetings", href: "/meetings", icon: Video },
+  { title: "Channels", href: "/channels", icon: MessagesSquare },
+  { title: "Ask Vakta", href: "/ask", icon: Sparkles },
+  { title: "Topic Tracker", href: "/topics", icon: Hash },
   { title: "Search", href: "/search", icon: Search },
   { title: "Analytics", href: "/analytics", icon: BarChart3 },
   { title: "Team", href: "/team", icon: Users },

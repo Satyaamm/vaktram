@@ -1,44 +1,15 @@
-"""Supabase JWT verification middleware."""
+"""JWT verification middleware."""
 
 from __future__ import annotations
 
+import logging
+
 import jwt
-from fastapi import Request, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from app.config import get_settings
+from fastapi import HTTPException, Request, status
 
-settings = get_settings()
-bearer_scheme = HTTPBearer(auto_error=False)
+from app.utils.security import decode_token
 
-
-def decode_supabase_jwt(token: str) -> dict:
-    """Decode and verify a Supabase-issued JWT.
-
-    Returns the decoded payload or raises HTTPException on failure.
-    """
-    if not settings.supabase_jwt_secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="JWT secret not configured",
-        )
-    try:
-        payload = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-        )
-    except jwt.InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {exc}",
-        )
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user_from_token(request: Request) -> dict:
@@ -53,4 +24,24 @@ async def get_current_user_from_token(request: Request) -> dict:
             detail="Missing or invalid Authorization header",
         )
     token = auth.split(" ", 1)[1]
-    return decode_supabase_jwt(token)
+
+    try:
+        payload = decode_token(token)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+        )
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {exc}",
+        )
+
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+        )
+
+    return payload

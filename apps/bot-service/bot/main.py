@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
-from bot.orchestrator import BotOrchestrator
+from bot.orchestrator import BotOrchestrator, detect_platform
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +44,13 @@ app = FastAPI(
 
 class StartBotRequest(BaseModel):
     meeting_id: str = Field(..., description="Internal meeting record ID")
-    meeting_url: str = Field(..., description="The meeting join link (Google Meet, Zoom, etc.)")
-    platform: str = Field(default="google_meet", description="Platform identifier")
+    meeting_url: str = Field(..., description="The meeting join link (Google Meet, Zoom, Teams)")
+    platform: Optional[str] = Field(
+        default=None,
+        description="Platform identifier; auto-detected from URL when omitted",
+    )
     bot_name: str = Field(default="Vaktram Notetaker", description="Display name for the bot")
-    callback_url: Optional[str] = Field(default=None, description="Webhook URL for status updates")
+    user_id: Optional[str] = Field(default=None, description="Owner user ID for audio upload callback")
     organization_id: Optional[str] = Field(default=None, description="Organization ID for storage path")
 
 
@@ -89,19 +92,20 @@ async def start_bot(request: StartBotRequest, background_tasks: BackgroundTasks)
     if orchestrator.has_bot(request.meeting_id):
         raise HTTPException(status_code=409, detail="Bot already active for this meeting")
 
+    platform = request.platform or detect_platform(request.meeting_url)
     try:
         bot_info = await orchestrator.start_bot(
             meeting_id=request.meeting_id,
             meeting_url=request.meeting_url,
-            platform=request.platform,
+            platform=platform,
             bot_name=request.bot_name,
-            callback_url=request.callback_url,
+            user_id=request.user_id,
             organization_id=request.organization_id,
         )
         return BotStatusResponse(
             meeting_id=request.meeting_id,
             status=bot_info["status"],
-            platform=request.platform,
+            platform=platform,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

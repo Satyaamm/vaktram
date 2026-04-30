@@ -20,6 +20,7 @@ export async function createAIConfig(data: {
   model_name: string;
   api_key?: string;
   base_url?: string;
+  extra_config?: Record<string, string>;
   is_default?: boolean;
 }): Promise<UserAIConfig> {
   return api.post<UserAIConfig>("/api/v1/ai-config", data);
@@ -32,6 +33,7 @@ export async function updateAIConfig(
     model_name: string;
     api_key: string;
     base_url: string;
+    extra_config: Record<string, string>;
     is_default: boolean;
     is_active: boolean;
   }>
@@ -48,6 +50,7 @@ export async function testAIConfig(data: {
   model_name: string;
   api_key?: string;
   base_url?: string;
+  extra_config?: Record<string, string>;
 }): Promise<{ success: boolean; message: string; response_time_ms?: number }> {
   return api.post("/api/v1/ai-config/test", data);
 }
@@ -109,6 +112,17 @@ export async function getMeetingFrequency(period?: string): Promise<MeetingFrequ
 
 export async function getTopicFrequency(): Promise<TopicFrequency[]> {
   return api.get<TopicFrequency[]>("/api/v1/analytics/topics");
+}
+
+// Usage / Billing
+export interface UsageData {
+  meetings_this_month: number;
+  storage_used_mb: number;
+  plan: string;
+}
+
+export async function getUsage(): Promise<UsageData> {
+  return api.get<UsageData>("/api/v1/analytics/usage");
 }
 
 // Team

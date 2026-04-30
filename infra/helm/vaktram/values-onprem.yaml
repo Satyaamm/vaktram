@@ -1,0 +1,24 @@
+# On-prem / VPC overrides.
+# Run: helm install vaktram ./vaktram -f values-onprem.yaml
+
+global:
+  imageRegistry: registry.customer.example.com/vaktram
+  region: customer-vpc
+
+api:
+  hpa:
+    minReplicas: 2
+    maxReplicas: 10
+
+postgres:
+  external: false  # Bring your own Postgres in-cluster
+redis:
+  external: false
+
+onprem:
+  enabled: true
+
+ingress:
+  className: ""  # customer provides their own ingress
+  annotations: {}
+  tls: false     # often terminated upstream

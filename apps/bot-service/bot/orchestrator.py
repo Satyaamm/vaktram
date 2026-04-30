@@ -13,9 +13,12 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from bot.audio.processor import concatenate_chunks, wav_to_flac
-from bot.audio.uploader import upload_audio_file
+from bot.audio.uploader import upload_audio_to_api
+from bot.disclosure import announce as announce_consent
 from bot.platforms.base import BaseMeetingBot, BotState
 from bot.platforms.google_meet import GoogleMeetBot
+from bot.platforms.teams import TeamsBot
+from bot.platforms.zoom import ZoomBot
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +26,21 @@ API_URL = os.getenv("API_URL", "http://api:8000")
 
 PLATFORM_REGISTRY: Dict[str, type] = {
     "google_meet": GoogleMeetBot,
+    "zoom": ZoomBot,
+    "teams": TeamsBot,
 }
+
+
+def detect_platform(meeting_url: str) -> str:
+    """Best-effort platform detection from a meeting URL."""
+    u = (meeting_url or "").lower()
+    if "meet.google.com" in u:
+        return "google_meet"
+    if "zoom.us" in u or "zoom.com" in u:
+        return "zoom"
+    if "teams.microsoft.com" in u or "teams.live.com" in u:
+        return "teams"
+    return "google_meet"  # historical default
 
 
 class ManagedBot:
@@ -34,13 +51,13 @@ class ManagedBot:
         meeting_id: str,
         bot: BaseMeetingBot,
         platform: str,
-        callback_url: Optional[str] = None,
+        user_id: Optional[str] = None,
         organization_id: Optional[str] = None,
     ):
         self.meeting_id = meeting_id
         self.bot = bot
         self.platform = platform
-        self.callback_url = callback_url
+        self.user_id = user_id
         self.organization_id = organization_id
         self.task: Optional[asyncio.Task] = None
         self.started_at: float = time.time()
@@ -104,7 +121,7 @@ class BotOrchestrator:
         meeting_url: str,
         platform: str,
         bot_name: str = "Vaktram Notetaker",
-        callback_url: Optional[str] = None,
+        user_id: Optional[str] = None,
         organization_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Instantiate and launch a meeting bot."""
@@ -128,7 +145,7 @@ class BotOrchestrator:
                 meeting_id=meeting_id,
                 bot=bot,
                 platform=platform,
-                callback_url=callback_url,
+                user_id=user_id,
                 organization_id=organization_id,
             )
 
@@ -169,20 +186,53 @@ class BotOrchestrator:
         return result
 
     async def _run_bot(self, managed: ManagedBot) -> None:
-        """Main bot lifecycle: join -> record -> leave -> process & upload audio."""
-        # Capture audio output_dir before stop_recording clears the reference
+        """Main bot lifecycle: join -> record -> watch for end -> upload."""
         audio_output_dir: Optional[str] = None
+        max_duration_sec = int(os.getenv("BOT_MAX_DURATION_SEC", "10800"))  # 3h
+        end_check_interval = int(os.getenv("BOT_END_CHECK_INTERVAL_SEC", "10"))
         try:
             await managed.bot.join()
             await managed.bot.start_recording()
 
-            # Grab the audio capture output directory while it's still available
+            # Recording-consent disclosure: post a chat message announcing the
+            # bot. Required by two-party-consent law in CA, IL, FL, MA, MD,
+            # plus GDPR territories. Best-effort: a chat-disabled meeting
+            # doesn't block the recording.
+            page = getattr(managed.bot, "_page", None)
+            if page is not None:
+                try:
+                    await announce_consent(page, platform=managed.platform)
+                except Exception:
+                    logger.exception(
+                        "[%s] consent disclosure raised", managed.meeting_id
+                    )
+
             if hasattr(managed.bot, "_audio_capture") and managed.bot._audio_capture:
                 audio_output_dir = str(managed.bot._audio_capture.output_dir)
 
-            # Keep running until cancelled or the bot detects the meeting ended
+            # Watch for meeting end signals while recording. Three exits:
+            # 1) bot detects end-screen / participant_count<=1 / denied
+            # 2) max-duration safety net
+            # 3) external stop_bot() which cancels this task
+            start = time.time()
             while managed.bot.state == BotState.RECORDING:
-                await asyncio.sleep(2)
+                if time.time() - start > max_duration_sec:
+                    logger.warning(
+                        "[%s] Max duration (%ds) exceeded — leaving",
+                        managed.meeting_id, max_duration_sec,
+                    )
+                    break
+                try:
+                    if not await managed.bot.is_meeting_active():
+                        logger.info(
+                            "[%s] Meeting ended (detected by bot)", managed.meeting_id
+                        )
+                        break
+                except Exception:
+                    logger.exception(
+                        "[%s] is_meeting_active raised — continuing", managed.meeting_id
+                    )
+                await asyncio.sleep(end_check_interval)
 
         except asyncio.CancelledError:
             logger.info("Bot task cancelled for meeting %s", managed.meeting_id)
@@ -238,29 +288,13 @@ class BotOrchestrator:
             # Step 2: Convert WAV to FLAC for efficient storage
             flac_path = await wav_to_flac(wav_path)
 
-            # Step 3: Upload FLAC to Supabase Storage
-            organization_id = managed.organization_id or "default"
-            storage_key = await upload_audio_file(
+            # Step 3: Upload to R2 (or local fallback) and notify API
+            await upload_audio_to_api(
                 local_path=flac_path,
                 meeting_id=meeting_id,
-                organization_id=organization_id,
-                content_type="audio/flac",
+                user_id=managed.user_id or "",
+                organization_id=managed.organization_id,
             )
-
-            logger.info(
-                "[%s] Audio uploaded to storage: %s",
-                meeting_id,
-                storage_key,
-            )
-
-            # Step 4: Notify API that audio is ready for transcription
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    f"{API_URL}/internal/meetings/{meeting_id}/audio-ready",
-                    json={"storage_key": storage_key},
-                    timeout=10.0,
-                )
-                resp.raise_for_status()
 
             logger.info("[%s] API notified: audio-ready", meeting_id)
 

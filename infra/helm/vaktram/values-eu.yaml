@@ -1,0 +1,31 @@
+# EU residency overrides. Deploys into eu-west-1 with EU-only buckets.
+# Run: helm install vaktram-eu ./vaktram -f values-eu.yaml
+
+global:
+  region: eu-west-1
+  domain: app.eu.vaktram.com
+  apiDomain: api.eu.vaktram.com
+
+storage:
+  bucket: vaktram-audio-euw1
+  region: eu-west-1
+
+api:
+  hpa:
+    minReplicas: 2
+    maxReplicas: 20
+
+# Pin worker pools to EU node groups to avoid cross-region egress.
+bot:
+  nodeSelector:
+    topology.kubernetes.io/region: eu-west-1
+workerTranscribe:
+  nodeSelector:
+    topology.kubernetes.io/region: eu-west-1
+workerSummarize:
+  nodeSelector:
+    topology.kubernetes.io/region: eu-west-1
+workerDiarize:
+  nodeSelector:
+    topology.kubernetes.io/region: eu-west-1
+    nvidia.com/gpu: "true"

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Share2,
   Download,
@@ -11,8 +12,26 @@ import {
   Users as UsersIcon,
   Globe,
   AlertCircle,
+  Mic,
+  MicOff,
+  Loader2,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
+import { startBot, stopBot, deleteMeeting } from "@/lib/api/meetings";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Card,
   CardContent,
@@ -30,6 +49,7 @@ import {
 } from "@/components/audio-player/audio-player";
 import { TranscriptViewer } from "@/components/transcript/transcript-viewer";
 import { MeetingSummary } from "@/components/meetings/meeting-summary";
+import { SoundbitesTab } from "@/components/meetings/soundbites-tab";
 import { useMeeting, useTranscript, useSummary } from "@/lib/hooks/use-meeting";
 import {
   CheckCircle2,
@@ -109,6 +129,8 @@ export default function MeetingDetailPage() {
   const params = useParams<{ id: string }>();
   const meetingId = params.id;
 
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -116,17 +138,49 @@ export default function MeetingDetailPage() {
     data: meeting,
     isLoading: meetingLoading,
     error: meetingError,
+    refetch: refetchMeeting,
+    isFetching: meetingFetching,
   } = useMeeting(meetingId);
+
+  const startBotMutation = useMutation({
+    mutationFn: () => startBot(meetingId, meeting?.meeting_url || ""),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meeting", meetingId] });
+    },
+  });
+
+  const stopBotMutation = useMutation({
+    mutationFn: () => stopBot(meetingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meeting", meetingId] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteMeeting(meetingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      router.push("/meetings");
+    },
+  });
 
   const {
     data: transcript,
     isLoading: transcriptLoading,
+    refetch: refetchTranscript,
   } = useTranscript(meetingId);
 
   const {
     data: summary,
     isLoading: summaryLoading,
+    refetch: refetchSummary,
   } = useSummary(meetingId);
+
+  const handleRefresh = useCallback(() => {
+    refetchMeeting();
+    refetchTranscript();
+    refetchSummary();
+  }, [refetchMeeting, refetchTranscript, refetchSummary]);
 
   const handleTimestampClick = useCallback((time: number) => {
     audioPlayerRef.current?.seekTo(time);
@@ -184,9 +238,57 @@ export default function MeetingDetailPage() {
               {meeting.participants?.length ?? 0} participant
               {(meeting.participants?.length ?? 0) !== 1 ? "s" : ""}
             </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2"
+              onClick={handleRefresh}
+              disabled={meetingFetching}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${meetingFetching ? "animate-spin" : ""}`} />
+              <span className="ml-1 text-xs">Refresh</span>
+            </Button>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Bot Record / Stop controls */}
+          {meeting.meeting_url && meeting.status === "scheduled" && (
+            <Button
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={startBotMutation.isPending}
+              onClick={() => startBotMutation.mutate()}
+            >
+              {startBotMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Mic className="mr-2 h-4 w-4" />
+              )}
+              Record
+            </Button>
+          )}
+          {meeting.status === "in_progress" && (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={stopBotMutation.isPending}
+              onClick={() => stopBotMutation.mutate()}
+            >
+              {stopBotMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <MicOff className="mr-2 h-4 w-4" />
+              )}
+              Stop Recording
+            </Button>
+          )}
+          {startBotMutation.isError && (
+            <span className="text-xs text-red-600">
+              {startBotMutation.error instanceof Error
+                ? startBotMutation.error.message
+                : "Failed to start bot"}
+            </span>
+          )}
           <Button variant="outline" size="sm">
             <Share2 className="mr-2 h-4 w-4" />
             Share
@@ -195,6 +297,35 @@ export default function MeetingDetailPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this meeting?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete the meeting, transcript, summary, and all associated data. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => deleteMutation.mutate()}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -202,7 +333,7 @@ export default function MeetingDetailPage() {
       {meeting.audio_url ? (
         <AudioPlayer
           ref={audioPlayerRef}
-          audioUrl={meeting.audio_url}
+          audioUrl={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/meetings/${meeting.id}/audio?token=${useAuthStore.getState().accessToken || ""}`}
           onTimeUpdate={handleTimeUpdate}
         />
       ) : (
@@ -233,6 +364,7 @@ export default function MeetingDetailPage() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="soundbites">Soundbites</TabsTrigger>
         </TabsList>
 
         {/* Transcript Tab */}
@@ -402,6 +534,17 @@ export default function MeetingDetailPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Soundbites Tab */}
+        <TabsContent value="soundbites">
+          <SoundbitesTab
+            meetingId={params.id}
+            duration={meeting?.duration_seconds ?? null}
+            onSeek={(seconds) => {
+              audioPlayerRef.current?.seekTo(seconds);
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

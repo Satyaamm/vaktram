@@ -7,6 +7,8 @@ export interface UserProfile {
   role: string;
   is_active: boolean;
   onboarding_completed: boolean;
+  timezone: string | null;
+  language: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -131,6 +133,7 @@ export interface UserAIConfig {
   model_name: string;
   has_api_key: boolean;
   base_url: string | null;
+  extra_config: Record<string, string> | null;
   is_default: boolean;
   is_active: boolean;
   created_at: string;

@@ -1,4 +1,4 @@
-"""Bot orchestration service."""
+"""Bot orchestration service — calls the self-hosted bot-service container."""
 
 from __future__ import annotations
 
@@ -12,15 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models.meeting import Meeting, MeetingStatus
-from app.services.pipeline_service import PipelineService
 
 settings = get_settings()
 
 
 class BotService:
-    """Manages meeting bot lifecycle via Recall.ai (or similar) API."""
-
-    RECALL_BASE_URL = "https://api.recall.ai/api/v1"
+    """Manages meeting bot lifecycle via the self-hosted bot service."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -45,52 +42,68 @@ class BotService:
         if not url:
             raise HTTPException(status_code=400, detail="No meeting URL available")
 
-        if not settings.recall_api_key:
+        bot_url = settings.bot_service_url
+        if not bot_url:
             raise HTTPException(status_code=503, detail="Bot service not configured")
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self.RECALL_BASE_URL}/bot",
-                headers={"Authorization": f"Token {settings.recall_api_key}"},
-                json={
-                    "meeting_url": url,
-                    "bot_name": "Vaktram Notetaker",
-                    "transcription_options": {"provider": "default"},
-                },
-                timeout=30,
-            )
-            if resp.status_code not in (200, 201):
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Bot API error: {resp.text}",
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    f"{bot_url}/bots/start",
+                    json={
+                        "meeting_id": str(meeting_id),
+                        "meeting_url": url,
+                        "platform": meeting.platform.value if meeting.platform else "google_meet",
+                        "bot_name": "Vaktram Notetaker",
+                        "user_id": str(user_id),
+                        "organization_id": str(meeting.organization_id) if meeting.organization_id else None,
+                    },
                 )
-            data = resp.json()
 
-        meeting.bot_id = data.get("id")
-        meeting.status = MeetingStatus.in_progress
-        await self.db.flush()
+                if resp.status_code in (200, 201):
+                    meeting.status = MeetingStatus.in_progress
+                    meeting.bot_id = "active"
+                    await self.db.flush()
+                    return {
+                        "meeting_id": meeting_id,
+                        "bot_id": meeting.bot_id,
+                        "status": "joining",
+                        "message": "Bot is joining the meeting",
+                    }
+                elif resp.status_code == 409:
+                    return {
+                        "meeting_id": meeting_id,
+                        "bot_id": meeting.bot_id,
+                        "status": "already_active",
+                        "message": "Bot is already in the meeting",
+                    }
+                else:
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Bot service error: {resp.text}",
+                    )
 
-        return {
-            "meeting_id": meeting_id,
-            "bot_id": meeting.bot_id,
-            "status": "joining",
-            "message": "Bot is joining the meeting",
-        }
+        except httpx.ConnectError:
+            raise HTTPException(
+                status_code=503,
+                detail="Bot service is not reachable. Make sure it's running.",
+            )
 
     async def leave_meeting(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> dict[str, Any]:
         meeting = await self._get_meeting(meeting_id, user_id)
-        if not meeting.bot_id:
-            raise HTTPException(status_code=400, detail="No bot assigned to this meeting")
 
-        if settings.recall_api_key:
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"{self.RECALL_BASE_URL}/bot/{meeting.bot_id}/leave",
-                    headers={"Authorization": f"Token {settings.recall_api_key}"},
-                    timeout=30,
-                )
+        bot_url = settings.bot_service_url
+        if bot_url:
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    await client.post(
+                        f"{bot_url}/bots/stop",
+                        json={"meeting_id": str(meeting_id)},
+                    )
+            except Exception:
+                pass  # Bot may have already left
 
-        meeting.status = MeetingStatus.completed
+        meeting.status = MeetingStatus.processing
         await self.db.flush()
 
         return {
@@ -102,42 +115,27 @@ class BotService:
 
     async def get_status(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> dict[str, Any]:
         meeting = await self._get_meeting(meeting_id, user_id)
+
+        # Try to get live status from bot service
+        bot_url = settings.bot_service_url
+        if bot_url and meeting.bot_id:
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    resp = await client.get(f"{bot_url}/bots/{meeting_id}")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        return {
+                            "meeting_id": meeting_id,
+                            "bot_id": meeting.bot_id,
+                            "status": data.get("status", meeting.status.value),
+                            "message": f"Bot is {data.get('status', 'unknown')}",
+                        }
+            except Exception:
+                pass
+
         return {
             "meeting_id": meeting_id,
             "bot_id": meeting.bot_id,
             "status": meeting.status.value,
             "message": f"Meeting is {meeting.status.value}",
         }
-
-    async def handle_bot_event(self, event_type: str, bot_id: str, payload: dict[str, Any]) -> None:
-        """Process a webhook event from the bot platform."""
-        result = await self.db.execute(
-            select(Meeting).where(Meeting.bot_id == bot_id)
-        )
-        meeting = result.scalar_one_or_none()
-        if meeting is None:
-            return  # Unknown bot -- ignore
-
-        if event_type == "recording.done":
-            # Recording finished -- kick off the processing pipeline
-            audio_url = payload.get("audio_url", "")
-            pipeline = PipelineService(self.db)
-            await pipeline.on_audio_ready(
-                meeting_id=meeting.id,
-                audio_storage_path=audio_url,
-                user_id=meeting.user_id,
-            )
-        elif event_type == "bot.leave":
-            meeting.status = MeetingStatus.completed
-        elif event_type == "bot.error":
-            error_msg = payload.get("error", "Unknown bot error")
-            pipeline = PipelineService(self.db)
-            await pipeline.on_pipeline_error(
-                meeting_id=meeting.id,
-                stage="bot",
-                error=error_msg,
-            )
-        elif event_type == "bot.join":
-            meeting.status = MeetingStatus.in_progress
-
-        await self.db.flush()

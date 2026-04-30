@@ -16,7 +16,7 @@ export async function getMeetings(params?: {
   const searchParams = new URLSearchParams();
   if (params?.status) searchParams.set("status", params.status);
   if (params?.page) searchParams.set("page", String(params.page));
-  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.limit) searchParams.set("page_size", String(params.limit));
 
   const query = searchParams.toString();
   return api.get<MeetingList>(`/api/v1/meetings${query ? `?${query}` : ""}`);
@@ -64,6 +64,16 @@ export async function stopBot(
   return api.post<{ status: string; meeting_id: string }>(
     `/api/v1/bot/leave/${meetingId}`
   );
+}
+
+export async function uploadAudio(
+  file: File,
+  title?: string
+): Promise<Meeting> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (title) formData.append("title", title);
+  return api.postForm<Meeting>("/api/v1/meetings/upload-audio", formData);
 }
 
 export async function searchMeetings(
