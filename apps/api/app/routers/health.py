@@ -1,4 +1,10 @@
-"""Health check endpoint."""
+"""Health check endpoints.
+
+Both `/health` (liveness) and `/healthz` (readiness) accept GET *and* HEAD.
+HEAD support matters because most external monitors (UptimeRobot, K8s probes,
+AWS / GCP load balancers) default to HEAD for cheaper checks; without it
+they'd see 405 Method Not Allowed and report the API as down.
+"""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -9,15 +15,15 @@ from app.dependencies import get_db
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
-    """Basic liveness probe."""
+    """Liveness — returns 200 if the process is alive."""
     return {"status": "ok"}
 
 
-@router.get("/healthz")
+@router.api_route("/healthz", methods=["GET", "HEAD"])
 async def deep_health_check(db: AsyncSession = Depends(get_db)):
-    """Readiness probe -- verifies database connectivity."""
+    """Readiness — also confirms database connectivity."""
     try:
         await db.execute(text("SELECT 1"))
         db_status = "connected"
