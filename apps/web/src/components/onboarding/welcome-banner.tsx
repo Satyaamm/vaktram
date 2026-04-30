@@ -71,7 +71,7 @@ export function WelcomeBanner() {
       <div className="p-5">
         <div className="flex items-center gap-2 mb-3">
           <Check className="h-5 w-5 text-teal-700" />
-          <p className="font-semibold">You're set up. Three things to make Vaktram sing:</p>
+          <p className="font-semibold">You&apos;re set up. Three things to make Vaktram sing:</p>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           {STEPS.map((s) => (

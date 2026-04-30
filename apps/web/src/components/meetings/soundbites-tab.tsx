@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Scissors,
@@ -19,7 +19,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { soundbitesApi, type Soundbite } from "@/lib/api/soundbites";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const APP_BASE = process.env.NEXT_PUBLIC_APP_URL || "";
 
 function formatTimestamp(s: number): string {

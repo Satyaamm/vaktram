@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,30 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 
 type Status = "loading" | "success" | "error";
 
+// useSearchParams forces client-side rendering. App Router needs that piece
+// wrapped in a Suspense boundary so the rest of the route can pre-render.
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<VerifyEmailSkeleton />}>
+      <VerifyEmailInner />
+    </Suspense>
+  );
+}
+
+function VerifyEmailSkeleton() {
+  return (
+    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
+      <CardHeader className="text-center pb-4">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+        <CardTitle className="text-xl font-bold">Verifying your email…</CardTitle>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function VerifyEmailInner() {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token");

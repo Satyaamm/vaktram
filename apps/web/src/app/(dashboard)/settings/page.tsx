@@ -35,9 +35,7 @@ import {
   authorizeCalendar,
   syncCalendar,
   disconnectCalendar,
-  getUsage,
 } from "@/lib/api/settings";
-import { PLAN_LIMITS } from "@/lib/constants";
 import type { UserProfile, UserAIConfig } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore, type BackendProfile } from "@/lib/stores/auth-store";
