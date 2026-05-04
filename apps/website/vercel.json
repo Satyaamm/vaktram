@@ -4,17 +4,5 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "trailingSlash": false,
-  "redirects": [
-    {
-      "source": "/docs",
-      "destination": "https://docs.vaktram.com",
-      "permanent": false
-    },
-    {
-      "source": "/docs/:path*",
-      "destination": "https://docs.vaktram.com/:path*",
-      "permanent": false
-    }
-  ]
+  "trailingSlash": false
 }

@@ -46,11 +46,6 @@ export default function ContactPage() {
                   value="Sign in to your dashboard"
                   href={`${APP_URL}/login`}
                 />
-                <ContactItem
-                  label="Status"
-                  value="status.vaktram.com"
-                  href="https://status.vaktram.com"
-                />
               </div>
             </div>
 

@@ -18,13 +18,6 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     ],
   },
   {
-    title: "Resources",
-    links: [
-      { label: "Docs", href: "https://docs.vaktram.com" },
-      { label: "Status", href: "https://status.vaktram.com" },
-    ],
-  },
-  {
     title: "Legal",
     links: [
       { label: "Privacy", href: "/privacy" },
@@ -36,7 +29,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 bg-white">
-      <div className="container-wide grid grid-cols-2 gap-10 py-16 md:grid-cols-6">
+      <div className="container-wide grid grid-cols-2 gap-10 py-16 md:grid-cols-5">
         <div className="col-span-2">
           <Link href="/" className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-sm font-bold text-white">
