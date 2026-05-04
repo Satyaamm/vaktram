@@ -18,6 +18,7 @@ from bot.disclosure import announce as announce_consent
 from bot.platforms.base import BaseMeetingBot, BotState
 from bot.platforms.google_meet import GoogleMeetBot
 from bot.platforms.teams import TeamsBot
+from bot.platforms.zoho import ZohoBot
 from bot.platforms.zoom import ZoomBot
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ PLATFORM_REGISTRY: Dict[str, type] = {
     "google_meet": GoogleMeetBot,
     "zoom": ZoomBot,
     "teams": TeamsBot,
+    "zoho": ZohoBot,
 }
 
 
@@ -40,6 +42,12 @@ def detect_platform(meeting_url: str) -> str:
         return "zoom"
     if "teams.microsoft.com" in u or "teams.live.com" in u:
         return "teams"
+    # Zoho Meeting URLs come in two shapes:
+    #   1) meeting.zoho.{com,in,eu,com.au,com.cn}/join?key=<10-digit>
+    #   2) meet.zoho.com/<short-code>            (share link)
+    # The same meeting key works across regional domains.
+    if "meeting.zoho." in u or "meet.zoho.com" in u:
+        return "zoho"
     return "google_meet"  # historical default
 
 
@@ -304,9 +312,11 @@ class BotOrchestrator:
             )
             # Notify API about the pipeline error
             try:
+                bot_secret = os.getenv("BOT_SHARED_SECRET", "")
                 async with httpx.AsyncClient() as client:
                     await client.post(
                         f"{API_URL}/internal/meetings/{meeting_id}/pipeline-error",
+                        headers={"X-Bot-Auth": bot_secret} if bot_secret else {},
                         json={
                             "stage": "audio_upload",
                             "error": str(exc),

@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 
 API_URL = os.getenv("API_URL", "http://api:8000")
 DEFAULT_REGION = os.getenv("REGION", "us-east-1")
+BOT_SHARED_SECRET = os.getenv("BOT_SHARED_SECRET", "")
+
+
+def _internal_headers() -> dict[str, str]:
+    """Header pair the API requires on /internal/* callbacks."""
+    return {"X-Bot-Auth": BOT_SHARED_SECRET} if BOT_SHARED_SECRET else {}
 
 
 async def upload_audio_to_api(
@@ -65,6 +71,7 @@ async def upload_audio_to_api(
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             f"{API_URL}/internal/meetings/{meeting_id}/audio-ready",
+            headers=_internal_headers(),
             json={"audio_storage_path": storage_uri, "user_id": user_id},
         )
         resp.raise_for_status()

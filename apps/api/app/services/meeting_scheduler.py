@@ -118,6 +118,19 @@ async def start_scheduler() -> None:
         replace_existing=True,
     )
 
+    # Daily retention purge: deletes meetings (and cascading transcripts /
+    # summaries / embeddings) that exceed their org's retention policy or the
+    # platform default (settings.default_retention_days). Without this the
+    # platform accumulates user data indefinitely — a GDPR Article 5(1)(e)
+    # violation and a contractual issue for any enterprise customer.
+    sched.add_job(
+        run_retention_purge,
+        trigger=IntervalTrigger(hours=24),
+        id="retention_purge",
+        name="Delete meetings past their retention window",
+        replace_existing=True,
+    )
+
     sched.start()
     logger.info("APScheduler started with %d jobs", len(sched.get_jobs()))
 
@@ -274,6 +287,27 @@ async def sync_all_calendars() -> None:
             logger.info("Calendar sync completed for %d users", len(connections))
 
 
+async def run_retention_purge() -> None:
+    """Daily: drop meetings (and cascading rows) past their retention.
+
+    Wrapped in its own session/commit so a failure here doesn't poison the
+    other scheduled jobs. settings.default_retention_days applies to orgs
+    without an explicit RetentionPolicy."""
+    from app.services import retention_service
+
+    async for session in get_async_session():
+        try:
+            count = await retention_service.purge_expired(
+                session, default_days=settings.default_retention_days
+            )
+            await session.commit()
+            if count:
+                logger.info("Retention purge deleted %d meeting(s)", count)
+        except Exception:
+            await session.rollback()
+            logger.exception("Retention purge job failed")
+
+
 async def cleanup_old_jobs() -> None:
     """Delete completed/failed scheduled jobs older than 30 days."""
     async for session in get_async_session():
@@ -329,8 +363,11 @@ async def deploy_bot_for_meeting(meeting_id: str, job_id: str) -> None:
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
+                from app.services.bot_service import _bot_auth_headers
+
                 resp = await client.post(
                     f"{bot_url}/bots/start",
+                    headers=_bot_auth_headers(),
                     json={
                         "meeting_id": str(meeting.id),
                         "meeting_url": meeting.meeting_url,

@@ -1,14 +1,21 @@
 """
 Bot Service - FastAPI application for managing meeting bots.
 Provides endpoints to start/stop bots, check health, and manage sessions.
+
+Auth model: every endpoint except /health requires the
+`X-Bot-Auth` header to match `BOT_SHARED_SECRET`. The Vaktram API knows
+the same secret and includes it on every dispatch. Without this gate the
+service is fully exposed to the internet (port 8001 on the VPS) and any
+attacker can spawn bots into arbitrary meetings or stop existing ones.
 """
 
-import os
+import hmac
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import Depends, FastAPI, Header, HTTPException, BackgroundTasks, status
 from pydantic import BaseModel, Field
 
 from bot.orchestrator import BotOrchestrator, detect_platform
@@ -16,8 +23,26 @@ from bot.orchestrator import BotOrchestrator, detect_platform
 logger = logging.getLogger(__name__)
 
 API_URL = os.getenv("API_URL", "http://api:8000")
+BOT_SHARED_SECRET = os.getenv("BOT_SHARED_SECRET", "").strip()
+if not BOT_SHARED_SECRET:
+    # Refuse to boot without a secret — the bot service is exposed publicly
+    # on the VPS, so a missing secret means anyone can drive recordings.
+    raise RuntimeError(
+        "BOT_SHARED_SECRET must be set. Generate with: "
+        "python -c 'import secrets; print(secrets.token_urlsafe(32))' "
+        "and set the same value on this host AND in the API's env."
+    )
 
 orchestrator = BotOrchestrator()
+
+
+def require_bot_auth(x_bot_auth: str = Header(default="")) -> None:
+    """Constant-time check of the shared secret on every protected endpoint."""
+    if not hmac.compare_digest(x_bot_auth or "", BOT_SHARED_SECRET):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid X-Bot-Auth header",
+        )
 
 
 @asynccontextmanager
@@ -86,7 +111,11 @@ async def health_check():
     )
 
 
-@app.post("/bots/start", response_model=BotStatusResponse)
+@app.post(
+    "/bots/start",
+    response_model=BotStatusResponse,
+    dependencies=[Depends(require_bot_auth)],
+)
 async def start_bot(request: StartBotRequest, background_tasks: BackgroundTasks):
     """Launch a bot into a meeting."""
     if orchestrator.has_bot(request.meeting_id):
@@ -114,7 +143,11 @@ async def start_bot(request: StartBotRequest, background_tasks: BackgroundTasks)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.post("/bots/stop", response_model=BotStatusResponse)
+@app.post(
+    "/bots/stop",
+    response_model=BotStatusResponse,
+    dependencies=[Depends(require_bot_auth)],
+)
 async def stop_bot(request: StopBotRequest):
     """Stop a running bot and finalize the recording."""
     if not orchestrator.has_bot(request.meeting_id):
@@ -133,7 +166,11 @@ async def stop_bot(request: StopBotRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@app.get("/bots/{meeting_id}", response_model=BotStatusResponse)
+@app.get(
+    "/bots/{meeting_id}",
+    response_model=BotStatusResponse,
+    dependencies=[Depends(require_bot_auth)],
+)
 async def get_bot_status(meeting_id: str):
     """Get the current status of a bot."""
     status = orchestrator.get_bot_status(meeting_id)
@@ -142,7 +179,7 @@ async def get_bot_status(meeting_id: str):
     return status
 
 
-@app.get("/bots")
+@app.get("/bots", dependencies=[Depends(require_bot_auth)])
 async def list_bots():
     """List all active bots."""
     return {"bots": orchestrator.list_bots()}

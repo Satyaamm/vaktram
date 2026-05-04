@@ -72,6 +72,22 @@ _PROFILES: dict[str, dict[str, list[str]]] = {
             'button[aria-label*="Send" i]',
         ],
     },
+    "zoho": {
+        "open_chat": [
+            'button[aria-label*="Chat" i]',
+            'button[title*="Chat" i]',
+            'button:has-text("Chat")',
+        ],
+        "input": [
+            'textarea[placeholder*="message" i]',
+            'textarea[aria-label*="message" i]',
+            '[contenteditable="true"][aria-label*="message" i]',
+        ],
+        "send": [
+            'button[aria-label*="Send" i]',
+            'button[title*="Send" i]',
+        ],
+    },
 }
 
 

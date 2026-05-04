@@ -27,6 +27,8 @@ from app.services.pipeline_service import PipelineService
 from app.services.transcription_service import transcribe_audio
 from app.services.summarization_service import summarize_meeting
 from app.services.queue_service import publish_job
+from app.utils.internal_auth import require_internal_auth
+from app.utils.qstash_signature import verify_qstash_signature
 
 settings = get_settings()
 
@@ -81,7 +83,10 @@ class PipelineErrorRequest(BaseModel):
 
 # ── Pipeline trigger endpoints (called by QStash) ────────────────────────
 
-@router.post("/pipeline/transcribe/{meeting_id}")
+@router.post(
+    "/pipeline/transcribe/{meeting_id}",
+    dependencies=[Depends(verify_qstash_signature)],
+)
 async def pipeline_transcribe(
     meeting_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -210,7 +215,10 @@ async def pipeline_transcribe(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.post("/pipeline/summarize/{meeting_id}")
+@router.post(
+    "/pipeline/summarize/{meeting_id}",
+    dependencies=[Depends(verify_qstash_signature)],
+)
 async def pipeline_summarize(
     meeting_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -372,7 +380,10 @@ async def pipeline_summarize(
 
 # ── Legacy callbacks (kept for bot-service compatibility) ────────────────
 
-@router.post("/meetings/{meeting_id}/audio-ready")
+@router.post(
+    "/meetings/{meeting_id}/audio-ready",
+    dependencies=[Depends(require_internal_auth)],
+)
 async def audio_ready(
     meeting_id: uuid.UUID,
     body: AudioReadyRequest,
@@ -395,7 +406,10 @@ async def audio_ready(
     return {"status": "ok", "next_stage": "transcribing"}
 
 
-@router.post("/meetings/{meeting_id}/transcription-complete")
+@router.post(
+    "/meetings/{meeting_id}/transcription-complete",
+    dependencies=[Depends(require_internal_auth)],
+)
 async def transcription_complete(
     meeting_id: uuid.UUID,
     body: TranscriptionCompleteRequest,
@@ -410,7 +424,10 @@ async def transcription_complete(
     return {"status": "ok", "next_stage": "summarizing"}
 
 
-@router.post("/meetings/{meeting_id}/summarization-complete")
+@router.post(
+    "/meetings/{meeting_id}/summarization-complete",
+    dependencies=[Depends(require_internal_auth)],
+)
 async def summarization_complete(
     meeting_id: uuid.UUID,
     body: SummarizationCompleteRequest,
@@ -422,7 +439,10 @@ async def summarization_complete(
     return {"status": "ok", "next_stage": "done"}
 
 
-@router.post("/meetings/{meeting_id}/pipeline-error")
+@router.post(
+    "/meetings/{meeting_id}/pipeline-error",
+    dependencies=[Depends(require_internal_auth)],
+)
 async def pipeline_error(
     meeting_id: uuid.UUID,
     body: PipelineErrorRequest,

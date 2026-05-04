@@ -102,7 +102,7 @@ async def saml_acs(request: Request, db: AsyncSession = Depends(get_db)):
         conn=conn,
     )
     access = create_access_token(user.id, user.email)
-    refresh = create_refresh_token(user.id)
+    refresh, _jti = create_refresh_token(user.id)
     return RedirectResponse(
         f"{settings.frontend_base_url}/auth/sso-callback#access={access}&refresh={refresh}"
     )

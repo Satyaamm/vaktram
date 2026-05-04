@@ -30,7 +30,7 @@ DO $$ BEGIN CREATE TYPE vaktram.meeting_status AS ENUM
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN CREATE TYPE vaktram.meeting_platform AS ENUM
-  ('google_meet','zoom','teams','other');
+  ('google_meet','zoom','teams','zoho','other');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN CREATE TYPE vaktram.plan_tier AS ENUM

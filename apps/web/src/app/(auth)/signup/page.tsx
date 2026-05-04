@@ -5,19 +5,16 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Loader2, MailCheck, UserPlus, Eye, EyeOff } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Key, Loader2, MailCheck } from "lucide-react";
 import { signup, AuthError } from "@/lib/api/auth";
 
-// Client-side validation mirrors the server's Pydantic rules. Server is the
-// source of truth — these checks just give immediate feedback.
+// Marketing site lives at a separate domain (apps/website). Legal pages
+// linked from auth flows resolve there.
+const WEBSITE_URL =
+  process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram.com";
+
+// Client-side validation mirrors the server's Pydantic rules. The server
+// remains the source of truth — these checks just provide instant feedback.
 const NAME_RE = /^[A-Za-zÀ-ÖØ-öø-ÿ'.\- ]+$/;
 const PHONE_RE = /^\+?[0-9 ()\-]{7,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -157,81 +154,116 @@ export default function SignupPage() {
 
   if (done) {
     return (
-      <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
-        <CardHeader className="text-center pb-4">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+      <div className="space-y-6">
+        <header className="space-y-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-teal-50 text-teal-700">
             <MailCheck className="h-6 w-6" />
           </div>
-          <CardTitle className="text-xl font-bold">Check your email</CardTitle>
-          <CardDescription className="text-sm">
-            We sent a verification link to <b>{done.email}</b>. Click it to
-            activate your account — the link expires in 24 hours.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 px-6">
-          <p className="text-xs text-muted-foreground text-center">
-            Don&apos;t see it? Check spam, or{" "}
-            <Link
-              href={`/login?email=${encodeURIComponent(done.email)}`}
-              className="text-primary hover:underline"
-            >
-              go to login
-            </Link>{" "}
-            and request a new link from there.
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+            Check your email
+          </h2>
+          <p className="text-sm leading-relaxed text-slate-600">
+            We sent a verification link to{" "}
+            <span className="font-medium text-slate-900">{done.email}</span>.
+            Click it to activate your account — the link expires in 24 hours.
           </p>
-        </CardContent>
-        <CardFooter className="justify-center pb-6">
-          <p className="text-sm text-muted-foreground">
-            Already verified?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
+        </header>
+
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+          <div className="flex gap-2">
+            <Key className="mt-0.5 h-4 w-4 flex-none" />
+            <p className="leading-relaxed">
+              <span className="font-semibold">Heads up:</span> after verifying,
+              you&apos;ll add your own LLM API key (Gemini, OpenAI, Claude…)
+              before you can use Vaktram. We don&apos;t bundle a model.
+            </p>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Don&apos;t see the email? Check your spam folder, or{" "}
+          <Link
+            href={`/login?email=${encodeURIComponent(done.email)}`}
+            className="font-medium text-slate-900 hover:underline"
+          >
+            go to sign in
+          </Link>{" "}
+          to request a new one.
+        </p>
+
+        <p className="border-t border-slate-100 pt-5 text-center text-sm text-slate-500">
+          Already verified?{" "}
+          <Link href="/login" className="font-semibold text-slate-900 hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
-      <CardHeader className="text-center pb-4">
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-base">
-          V
-        </div>
-        <CardTitle className="text-xl font-bold">Create your account</CardTitle>
-        <CardDescription className="text-sm">
-          Free forever for your first 10 meetings/month.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 px-6">
-        {errors._form && (
-          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-            {errors._form}
-          </div>
-        )}
+    <div className="space-y-8">
+      <header className="space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+          Create your account
+        </h2>
+        <p className="text-sm text-slate-500">
+          Free for your first 10 meetings every month — no card required.
+        </p>
+      </header>
 
+      {/* BYOM heads-up — unmissable, sets expectations before signup */}
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+        <div className="flex gap-2">
+          <Key className="mt-0.5 h-4 w-4 flex-none" />
+          <p className="leading-relaxed">
+            <span className="font-semibold">Bring your own model.</span>{" "}
+            After verifying your email you&apos;ll connect an LLM API key
+            (Gemini, OpenAI, Claude, Mistral…). You stay in control of cost,
+            data, and provider.
+          </p>
+        </div>
+      </div>
+
+      {errors._form && (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+        >
+          {errors._form}
+        </div>
+      )}
+
+      <form
+        className="space-y-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
         <Field label="Full name" htmlFor="full_name" error={fieldError("full_name")}>
           <Input
             id="full_name"
             placeholder="Jane Doe"
-            className="h-11 rounded-lg"
+            className={fieldClass}
             value={form.full_name}
             onChange={(e) => set("full_name", e.target.value)}
             onBlur={() => blur("full_name")}
             disabled={loading}
             autoComplete="name"
+            autoFocus
           />
         </Field>
 
         <Field
-          label="Organization name"
+          label="Organization"
           htmlFor="org"
           error={fieldError("organization_name")}
         >
           <Input
             id="org"
             placeholder="Acme Inc"
-            className="h-11 rounded-lg"
+            className={fieldClass}
             value={form.organization_name}
             onChange={(e) => set("organization_name", e.target.value)}
             onBlur={() => blur("organization_name")}
@@ -240,12 +272,12 @@ export default function SignupPage() {
           />
         </Field>
 
-        <Field label="Email" htmlFor="email" error={fieldError("email")}>
+        <Field label="Work email" htmlFor="email" error={fieldError("email")}>
           <Input
             id="email"
             type="email"
             placeholder="you@company.com"
-            className="h-11 rounded-lg"
+            className={fieldClass}
             value={form.email}
             onChange={(e) => set("email", e.target.value)}
             onBlur={() => blur("email")}
@@ -262,8 +294,8 @@ export default function SignupPage() {
           <Input
             id="phone"
             type="tel"
-            placeholder="+1 415 555 1234"
-            className="h-11 rounded-lg"
+            placeholder="+91 98765 43210"
+            className={fieldClass}
             value={form.phone}
             onChange={(e) => set("phone", e.target.value)}
             onBlur={() => blur("phone")}
@@ -277,8 +309,8 @@ export default function SignupPage() {
             <Input
               id="password"
               type={showPwd ? "text" : "password"}
-              placeholder="At least 8 characters, 1 letter + 1 number"
-              className="h-11 rounded-lg pr-10"
+              placeholder="At least 8 characters · 1 letter · 1 number"
+              className={`${fieldClass} pr-10`}
               value={form.password}
               onChange={(e) => set("password", e.target.value)}
               onBlur={() => blur("password")}
@@ -288,7 +320,7 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => setShowPwd((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
               aria-label={showPwd ? "Hide password" : "Show password"}
               tabIndex={-1}
             >
@@ -296,14 +328,14 @@ export default function SignupPage() {
             </button>
           </div>
           {form.password.length > 0 && (
-            <div className="mt-1.5 flex items-center gap-2">
-              <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+            <div className="mt-2 flex items-center gap-2.5">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className={`h-1 transition-all ${strength.color}`}
                   style={{ width: `${strength.pct}%` }}
                 />
               </div>
-              <span className="text-xs text-muted-foreground w-20 text-right">
+              <span className="w-20 text-right text-xs text-slate-500">
                 {strength.label}
               </span>
             </div>
@@ -315,57 +347,75 @@ export default function SignupPage() {
           htmlFor="confirm"
           error={fieldError("password_confirm")}
         >
-          <Input
-            id="confirm"
-            type={showPwd ? "text" : "password"}
-            placeholder="Type it again"
-            className="h-11 rounded-lg"
-            value={form.password_confirm}
-            onChange={(e) => set("password_confirm", e.target.value)}
-            onBlur={() => blur("password_confirm")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
-            disabled={loading}
-            autoComplete="new-password"
-          />
+          <div className="relative">
+            <Input
+              id="confirm"
+              type={showPwd ? "text" : "password"}
+              placeholder="Type it again"
+              className={`${fieldClass} pr-10`}
+              value={form.password_confirm}
+              onChange={(e) => set("password_confirm", e.target.value)}
+              onBlur={() => blur("password_confirm")}
+              disabled={loading}
+              autoComplete="new-password"
+            />
+            {form.password_confirm.length > 0 &&
+              form.password_confirm === form.password && (
+                <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-teal-600" />
+              )}
+          </div>
         </Field>
 
         <Button
-          className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-          onClick={submit}
+          type="submit"
+          className="h-11 w-full rounded-md bg-slate-950 text-[15px] font-semibold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-50"
           disabled={loading}
         >
           {loading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Creating account…
+            </>
           ) : (
-            <UserPlus className="mr-2 h-4 w-4" />
+            "Create account"
           )}
-          Create account
         </Button>
-        <p className="text-xs text-center text-muted-foreground">
-          By signing up, you agree to our{" "}
-          <Link href="/terms" className="underline hover:text-primary">
+
+        <p className="text-center text-xs leading-relaxed text-slate-500">
+          By creating an account you agree to our{" "}
+          <a
+            href={`${WEBSITE_URL}/terms`}
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-900"
+          >
             Terms
-          </Link>{" "}
+          </a>{" "}
           and{" "}
-          <Link href="/privacy" className="underline hover:text-primary">
+          <a
+            href={`${WEBSITE_URL}/privacy`}
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-slate-900"
+          >
             Privacy Policy
-          </Link>
+          </a>
           .
         </p>
-      </CardContent>
-      <CardFooter className="justify-center pb-6">
-        <p className="text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </CardFooter>
-    </Card>
+      </form>
+
+      <p className="border-t border-slate-100 pt-5 text-center text-sm text-slate-500">
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-slate-900 hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }
+
+const fieldClass =
+  "h-11 rounded-md border-slate-200 bg-white text-[15px] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20";
 
 function Field({
   label,
@@ -379,12 +429,15 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1">
-      <Label htmlFor={htmlFor} className="text-sm">
+    <div className="space-y-1.5">
+      <Label
+        htmlFor={htmlFor}
+        className="text-xs font-medium uppercase tracking-wider text-slate-600"
+      >
         {label}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive mt-0.5">{error}</p>}
+      {error && <p className="mt-0.5 text-xs text-red-600">{error}</p>}
     </div>
   );
 }

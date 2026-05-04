@@ -21,9 +21,20 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
+    from app.services.encryption_service import EncryptionService
     from app.services.meeting_scheduler import start_scheduler, stop_scheduler
 
     logger.info("Starting Vaktram API (%s)", settings.environment)
+
+    # Validate ENCRYPTION_KEY immediately — Fernet raises if the key is
+    # missing or malformed. Without this guard the failure surfaces only
+    # when the first user-AI-config is decrypted, which may not happen
+    # until hours after deploy.
+    try:
+        EncryptionService()
+    except Exception as exc:
+        logger.critical("ENCRYPTION_KEY is invalid: %s", exc)
+        raise
 
     # Start APScheduler
     await start_scheduler()

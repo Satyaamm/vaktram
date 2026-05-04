@@ -6,16 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Lock, CheckCircle } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -39,15 +31,15 @@ function ResetPasswordForm() {
   const { toast } = useToast();
   const resetToken = searchParams.get("token") || "";
 
-  const handleResetPassword = async () => {
+  const submit = async () => {
     setError(null);
 
     if (!password) {
       setError("Please enter a new password.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     if (password !== confirmPassword) {
@@ -72,7 +64,7 @@ function ResetPasswordForm() {
       } else {
         setSuccess(true);
         toast({
-          title: "Password updated!",
+          title: "Password updated",
           description: "You can now sign in with your new password.",
         });
         setTimeout(() => router.push("/login"), 2000);
@@ -86,94 +78,117 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <CheckCircle className="h-5 w-5" />
+      <div className="space-y-6">
+        <header className="space-y-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+            <CheckCircle2 className="h-6 w-6" />
           </div>
-          <CardTitle className="text-xl font-bold">Password updated</CardTitle>
-          <CardDescription className="mt-2">
-            Your password has been reset. Redirecting you to sign in...
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="justify-center pb-6">
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+            Password updated
+          </h2>
+          <p className="text-sm text-slate-600">
+            Redirecting you to sign in…
+          </p>
+        </header>
+        <p className="border-t border-slate-100 pt-5">
           <Link
             href="/login"
-            className="text-sm font-medium text-primary hover:underline underline-offset-2"
+            className="text-sm font-semibold text-slate-900 hover:underline underline-offset-2"
           >
-            Sign in now
+            Sign in now →
           </Link>
-        </CardFooter>
-      </Card>
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
-      <CardHeader className="text-center pb-4">
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-base">
-          V
-        </div>
-        <CardTitle className="text-xl font-bold">Set new password</CardTitle>
-        <CardDescription className="text-sm">
-          Enter your new password below.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 px-6">
-        {error && (
-          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
+    <div className="space-y-8">
+      <header className="space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+          Set a new password
+        </h2>
+        <p className="text-sm text-slate-500">
+          Pick something you don&apos;t already use elsewhere.
+        </p>
+      </header>
 
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700"
+        >
+          {error}
+        </div>
+      )}
+
+      <form
+        className="space-y-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
         <div className="space-y-1.5">
-          <Label htmlFor="password" className="text-sm">New password</Label>
+          <Label
+            htmlFor="password"
+            className="text-xs font-medium uppercase tracking-wider text-slate-600"
+          >
+            New password
+          </Label>
           <Input
             id="password"
             type="password"
-            placeholder="At least 6 characters"
-            className="h-11 rounded-lg"
+            placeholder="At least 8 characters"
+            className="h-11 rounded-md border-slate-200 bg-white text-[15px] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
+            autoComplete="new-password"
+            autoFocus
           />
         </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="confirmPassword" className="text-sm">Confirm password</Label>
+          <Label
+            htmlFor="confirmPassword"
+            className="text-xs font-medium uppercase tracking-wider text-slate-600"
+          >
+            Confirm password
+          </Label>
           <Input
             id="confirmPassword"
             type="password"
             placeholder="Repeat your password"
-            className="h-11 rounded-lg"
+            className="h-11 rounded-md border-slate-200 bg-white text-[15px] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleResetPassword();
-            }}
             disabled={loading}
+            autoComplete="new-password"
           />
         </div>
+
         <Button
-          className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-          onClick={handleResetPassword}
+          type="submit"
+          className="h-11 w-full rounded-md bg-slate-950 text-[15px] font-semibold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-50"
           disabled={loading}
         >
           {loading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Updating…
+            </>
           ) : (
-            <Lock className="mr-2 h-4 w-4" />
+            "Update password"
           )}
-          Reset password
         </Button>
-      </CardContent>
-      <CardFooter className="justify-center pb-6">
-        <Link
-          href="/login"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
+      </form>
+
+      <p className="border-t border-slate-100 pt-5 text-center text-sm text-slate-500">
+        <Link href="/login" className="font-semibold text-slate-900 hover:underline">
           Back to sign in
         </Link>
-      </CardFooter>
-    </Card>
+      </p>
+    </div>
   );
 }

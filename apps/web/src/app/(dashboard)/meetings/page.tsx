@@ -102,6 +102,8 @@ function platformLabel(platform: Meeting["platform"]): string {
       return "Google Meet";
     case "teams":
       return "Teams";
+    case "zoho":
+      return "Zoho Meeting";
     default:
       return "Other";
   }
@@ -115,6 +117,8 @@ function PlatformIcon({ platform }: { platform: Meeting["platform"] }) {
       return <Monitor className="h-4 w-4 text-green-600" />;
     case "teams":
       return <UsersIcon className="h-4 w-4 text-purple-600" />;
+    case "zoho":
+      return <Video className="h-4 w-4 text-orange-600" />;
     default:
       return <Video className="h-4 w-4 text-muted-foreground" />;
   }

@@ -16,6 +16,19 @@ from app.models.meeting import Meeting, MeetingStatus
 settings = get_settings()
 
 
+def _bot_auth_headers() -> dict[str, str]:
+    """Build the X-Bot-Auth header for every outbound bot-service call."""
+    if not settings.bot_shared_secret:
+        # Surface the misconfiguration loudly rather than silently failing
+        # at the bot service with a 401 (which the operator may misread as
+        # a network problem).
+        raise HTTPException(
+            status_code=503,
+            detail="BOT_SHARED_SECRET is not configured on the API",
+        )
+    return {"X-Bot-Auth": settings.bot_shared_secret}
+
+
 class BotService:
     """Manages meeting bot lifecycle via the self-hosted bot service."""
 
@@ -50,6 +63,7 @@ class BotService:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.post(
                     f"{bot_url}/bots/start",
+                    headers=_bot_auth_headers(),
                     json={
                         "meeting_id": str(meeting_id),
                         "meeting_url": url,
@@ -98,6 +112,7 @@ class BotService:
                 async with httpx.AsyncClient(timeout=30) as client:
                     await client.post(
                         f"{bot_url}/bots/stop",
+                        headers=_bot_auth_headers(),
                         json={"meeting_id": str(meeting_id)},
                     )
             except Exception:
@@ -121,7 +136,10 @@ class BotService:
         if bot_url and meeting.bot_id:
             try:
                 async with httpx.AsyncClient(timeout=5) as client:
-                    resp = await client.get(f"{bot_url}/bots/{meeting_id}")
+                    resp = await client.get(
+                        f"{bot_url}/bots/{meeting_id}",
+                        headers=_bot_auth_headers(),
+                    )
                     if resp.status_code == 200:
                         data = resp.json()
                         return {

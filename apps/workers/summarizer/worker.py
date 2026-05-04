@@ -28,6 +28,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "10"))
 API_URL = os.getenv("API_URL", "http://api:8000")
+BOT_SHARED_SECRET = os.getenv("BOT_SHARED_SECRET", "")
+INTERNAL_HEADERS = {"X-Bot-Auth": BOT_SHARED_SECRET} if BOT_SHARED_SECRET else {}
 
 # Default LLM fallback configuration
 DEFAULT_LLM_PROVIDER = os.getenv("DEFAULT_LLM_PROVIDER", "gemini")
@@ -126,6 +128,7 @@ async def poll_for_jobs(default_summarizer: Summarizer, embedder: Embedder) -> N
                 async with httpx.AsyncClient() as client:
                     await client.post(
                         f"{API_URL}/internal/meetings/{meeting_id}/pipeline-error",
+                        headers=INTERNAL_HEADERS,
                         json={
                             "stage": "summarization",
                             "error": "No transcript segments found",
@@ -204,6 +207,7 @@ async def poll_for_jobs(default_summarizer: Summarizer, embedder: Embedder) -> N
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
                     f"{API_URL}/internal/meetings/{meeting_id}/summarization-complete",
+                    headers=INTERNAL_HEADERS,
                     json={"embedding_chunks": len(chunks) + 1},
                     timeout=10.0,
                 )
@@ -226,6 +230,7 @@ async def poll_for_jobs(default_summarizer: Summarizer, embedder: Embedder) -> N
                     async with httpx.AsyncClient() as client:
                         await client.post(
                             f"{API_URL}/internal/meetings/{meeting_id}/pipeline-error",
+                            headers=INTERNAL_HEADERS,
                             json={
                                 "stage": "summarization",
                                 "error": str(exc),

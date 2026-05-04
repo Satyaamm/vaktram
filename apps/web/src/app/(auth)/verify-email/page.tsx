@@ -3,9 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { verifyEmail, AuthError } from "@/lib/api/auth";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
@@ -23,14 +22,16 @@ export default function VerifyEmailPage() {
 
 function VerifyEmailSkeleton() {
   return (
-    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
-      <CardHeader className="text-center pb-4">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    <div className="space-y-6">
+      <header className="space-y-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
-        <CardTitle className="text-xl font-bold">Verifying your email…</CardTitle>
-      </CardHeader>
-    </Card>
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+          Verifying your email…
+        </h2>
+      </header>
+    </div>
   );
 }
 
@@ -39,7 +40,7 @@ function VerifyEmailInner() {
   const params = useSearchParams();
   const token = params.get("token");
 
-  const { setTokens, setProfile } = useAuthStore();
+  const { setAccessToken, setProfile } = useAuthStore();
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string>("");
 
@@ -54,11 +55,11 @@ function VerifyEmailInner() {
       try {
         const tokens = await verifyEmail(token);
         if (cancelled) return;
-        setTokens(tokens.access_token, tokens.refresh_token);
+        setAccessToken(tokens.access_token);
         setProfile(tokens.user);
         setStatus("success");
         // Land brand-new users on AI config (BYOM is required to use anything),
-        // not the empty dashboard. Existing users go to /dashboard.
+        // not the empty dashboard.
         setTimeout(
           () => router.push("/settings/ai-config?from=verify"),
           1200,
@@ -78,55 +79,62 @@ function VerifyEmailInner() {
     return () => {
       cancelled = true;
     };
-  }, [token, router, setTokens, setProfile]);
+  }, [token, router, setAccessToken, setProfile]);
 
   return (
-    <Card className="w-full border-slate-200/80 shadow-xl shadow-slate-900/[0.04]">
-      <CardHeader className="text-center pb-4">
+    <div className="space-y-6">
+      <header className="space-y-3">
         {status === "loading" && (
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+            <Loader2 className="h-6 w-6 animate-spin" />
           </div>
         )}
         {status === "success" && (
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-teal-50 text-teal-700">
             <CheckCircle2 className="h-6 w-6" />
           </div>
         )}
         {status === "error" && (
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+          <div className="flex h-12 w-12 items-center justify-center rounded-md bg-amber-50 text-amber-700">
             <AlertTriangle className="h-6 w-6" />
           </div>
         )}
-        <CardTitle className="text-xl font-bold">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
           {status === "loading" && "Verifying your email…"}
           {status === "success" && "Email verified"}
           {status === "error" && "Verification failed"}
-        </CardTitle>
-        <CardDescription className="text-sm">
+        </h2>
+        <p className="text-sm leading-relaxed text-slate-600">
           {status === "loading" && "Hold tight, this only takes a moment."}
-          {status === "success" && "Welcome to Vaktram. Redirecting to your dashboard…"}
+          {status === "success" &&
+            "Welcome to Vaktram. Taking you to add your LLM key…"}
           {status === "error" && error}
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </header>
+
       {status === "error" && (
         <>
-          <CardContent className="px-6">
-            <p className="text-sm text-muted-foreground">
-              If the link expired, return to the login page and request a fresh
-              verification email.
-            </p>
-          </CardContent>
-          <CardFooter className="flex justify-center gap-2 pb-6">
-            <Link href="/login">
-              <Button variant="outline">Go to login</Button>
+          <p className="text-sm text-slate-500">
+            If the link expired, head back to sign in and request a fresh
+            verification email from there.
+          </p>
+          <div className="flex gap-2 pt-2">
+            <Link href="/login" className="flex-1">
+              <Button
+                variant="outline"
+                className="h-11 w-full rounded-md border-slate-200"
+              >
+                Go to sign in
+              </Button>
             </Link>
-            <Link href="/signup">
-              <Button>Sign up again</Button>
+            <Link href="/signup" className="flex-1">
+              <Button className="h-11 w-full rounded-md bg-slate-950 hover:bg-slate-800">
+                Sign up again
+              </Button>
             </Link>
-          </CardFooter>
+          </div>
         </>
       )}
-    </Card>
+    </div>
   );
 }

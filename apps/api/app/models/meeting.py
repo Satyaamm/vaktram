@@ -38,6 +38,7 @@ class MeetingPlatform(str, enum.Enum):
     google_meet = "google_meet"
     zoom = "zoom"
     teams = "teams"
+    zoho = "zoho"
     other = "other"
 
 

@@ -1,25 +1,23 @@
-// Edge middleware: redirect unauthed users away from protected routes,
-// and redirect already-authed users away from auth pages.
+// Edge middleware: gate protected routes on the presence of a session-hint
+// cookie, and bounce already-signed-in users away from auth pages.
 //
-// Auth-state lives in localStorage (set by /lib/stores/auth-store) and is
-// mirrored to a `vaktram_token` cookie so this edge function can see it.
-// If the cookie is absent we never assume signed-out — the matcher only
-// applies to specific paths so static + API + Next internals are excluded
-// at the matcher level (cheaper than checking inside the function).
+// Auth state lives in:
+//   • `vaktram_refresh` — HttpOnly cookie on the API domain. The browser
+//     attaches it automatically; this middleware can NOT see it (different
+//     registrable domain).
+//   • `vaktram_session` — a non-HttpOnly hint cookie set by the API on the
+//     same response. Value is just "1"; it carries no credential. We use
+//     it here purely to avoid flashing the dashboard for visibly-signed-out
+//     users. The real auth check is the JWT on every API call.
+//
+// Important: the hint cookie is also on the API origin, NOT the Vercel
+// origin, so this middleware in fact cannot see it either. We therefore
+// fall back to client-side guarding: the dashboard layout calls
+// `bootstrapSession()` and redirects to /login if it returns null. The
+// middleware below only matches the auth pages so signed-in users don't
+// get stuck on /login if they revisit the URL.
 
 import { NextResponse, type NextRequest } from "next/server";
-
-const PROTECTED_PREFIXES = [
-  "/dashboard",
-  "/meetings",
-  "/settings",
-  "/analytics",
-  "/search",
-  "/team",
-  "/ask",
-  "/topics",
-  "/channels",
-];
 
 const AUTH_PATHS = new Set([
   "/login",
@@ -30,16 +28,13 @@ const AUTH_PATHS = new Set([
 ]);
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get("vaktram_token")?.value;
+  // The session-hint cookie may not be reachable cross-origin, so this
+  // check only catches the same-origin case (e.g. a future custom domain).
+  // The real gate is in the dashboard layout's client-side bootstrap.
+  const hasHint = Boolean(request.cookies.get("vaktram_session")?.value);
   const { pathname } = request.nextUrl;
 
-  if (!token && PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-
-  if (token && AUTH_PATHS.has(pathname)) {
+  if (hasHint && AUTH_PATHS.has(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
@@ -48,21 +43,8 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Only run middleware on the routes that actually need auth gating.
-// This explicit allowlist is much safer than a regex with file-extension
-// negative-lookaheads, which is what triggers MIDDLEWARE_INVOCATION_FAILED
-// on certain Vercel edge runtimes.
 export const config = {
   matcher: [
-    "/dashboard/:path*",
-    "/meetings/:path*",
-    "/settings/:path*",
-    "/analytics/:path*",
-    "/search/:path*",
-    "/team/:path*",
-    "/ask/:path*",
-    "/topics/:path*",
-    "/channels/:path*",
     "/login",
     "/signup",
     "/forgot-password",

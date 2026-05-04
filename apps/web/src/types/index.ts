@@ -38,7 +38,7 @@ export interface Meeting {
   user_id: string;
   organization_id: string | null;
   status: "scheduled" | "in_progress" | "processing" | "transcribing" | "summarizing" | "completed" | "cancelled" | "failed";
-  platform: "google_meet" | "zoom" | "teams" | "other";
+  platform: "google_meet" | "zoom" | "teams" | "zoho" | "other";
   meeting_url: string | null;
   scheduled_start: string | null;
   scheduled_end: string | null;
@@ -65,7 +65,7 @@ export interface MeetingList {
 export interface CreateMeetingInput {
   title: string;
   meeting_url?: string;
-  platform?: "google_meet" | "zoom" | "teams" | "other";
+  platform?: "google_meet" | "zoom" | "teams" | "zoho" | "other";
   scheduled_start?: string;
   scheduled_end?: string;
   auto_record?: boolean;

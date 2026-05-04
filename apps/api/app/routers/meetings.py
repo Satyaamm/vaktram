@@ -142,8 +142,28 @@ ALLOWED_AUDIO_TYPES = {
     "audio/flac", "audio/ogg", "audio/webm", "audio/mp4",
     "audio/m4a", "audio/x-m4a", "video/webm", "video/mp4",
 }
+# Whitelist of acceptable file extensions. Anything else gets rewritten to
+# `.bin` so a path like `evil.php.mp3` cannot land on disk under a
+# server-side-executable extension.
+ALLOWED_EXTENSIONS = {"mp3", "wav", "flac", "ogg", "webm", "mp4", "m4a"}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 UPLOAD_DIR = "/tmp/vaktram/uploads"
+
+
+def _safe_extension(filename: str | None) -> str:
+    """Pull a lowercase extension off `filename`, allowlist-filtered.
+    Returns "bin" for anything missing, unrecognised, or path-traversing."""
+    if not filename:
+        return "bin"
+    # Strip directory components so `../foo.mp3` can't escape UPLOAD_DIR.
+    base = os.path.basename(filename)
+    if "." not in base:
+        return "bin"
+    ext = base.rsplit(".", 1)[-1].lower()
+    # Reject anything containing path separators or shell metacharacters.
+    if not ext.isalnum() or len(ext) > 8:
+        return "bin"
+    return ext if ext in ALLOWED_EXTENSIONS else "bin"
 
 
 @router.post("/upload-audio", response_model=MeetingRead, status_code=status.HTTP_201_CREATED)
@@ -175,7 +195,7 @@ async def upload_audio(
 
     # Save to local filesystem
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    file_ext = (file.filename or "audio").rsplit(".", 1)[-1] if file.filename else "bin"
+    file_ext = _safe_extension(file.filename)
     meeting_id = uuid.uuid4()
     local_path = os.path.join(UPLOAD_DIR, f"{meeting_id}.{file_ext}")
 

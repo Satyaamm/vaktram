@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
 from app.services.calendar_service import CalendarService
+from app.utils.internal_auth import require_internal_auth
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -46,12 +47,15 @@ async def google_calendar_webhook(
     return {"status": "processed"}
 
 
-@router.post("/bot-events")
+@router.post("/bot-events", dependencies=[Depends(require_internal_auth)])
 async def bot_event_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Handle bot status callback events from the self-hosted bot service."""
+    """Handle bot status callback events from the self-hosted bot service.
+
+    Authenticated by the shared bot secret — only the bot service (or a
+    worker that knows BOT_SHARED_SECRET) can drive meeting state."""
     body = await request.json()
     event_type = body.get("event")
     meeting_id = body.get("meeting_id")

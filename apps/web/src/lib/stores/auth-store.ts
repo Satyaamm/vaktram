@@ -15,26 +15,31 @@ export interface BackendProfile {
 }
 
 interface AuthState {
+  // Access token lives in JS memory only — never persisted. An XSS payload
+  // can still steal it from this store while it's loaded, but it expires in
+  // 15 minutes and the refresh token is HttpOnly, so the attacker can't
+  // mint new ones.
   accessToken: string | null;
-  refreshToken: string | null;
+
+  // Profile is non-credential and used for UI hints; persisted to
+  // localStorage so a page reload doesn't flash an unauthenticated UI
+  // before /refresh + /me complete.
   profile: BackendProfile | null;
+
   isLoading: boolean;
 
-  setTokens: (accessToken: string, refreshToken: string) => void;
+  setAccessToken: (token: string | null) => void;
   setProfile: (profile: BackendProfile | null) => void;
   setLoading: (isLoading: boolean) => void;
   clear: () => void;
 }
 
-function getStored(key: string): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(key);
-}
+const PROFILE_KEY = "vaktram_profile";
 
 function getStoredProfile(): BackendProfile | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem("vaktram_profile");
+    const raw = localStorage.getItem(PROFILE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -42,24 +47,19 @@ function getStoredProfile(): BackendProfile | null {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: getStored("vaktram_access_token"),
-  refreshToken: getStored("vaktram_refresh_token"),
+  accessToken: null,
   profile: getStoredProfile(),
   isLoading: true,
 
-  setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem("vaktram_access_token", accessToken);
-    localStorage.setItem("vaktram_refresh_token", refreshToken);
-    // Cookie for Next.js middleware route protection
-    document.cookie = `vaktram_token=${accessToken}; path=/; max-age=${60 * 60 * 24}; SameSite=Lax`;
-    set({ accessToken, refreshToken });
-  },
+  setAccessToken: (accessToken) => set({ accessToken }),
 
   setProfile: (profile) => {
-    if (profile) {
-      localStorage.setItem("vaktram_profile", JSON.stringify(profile));
-    } else {
-      localStorage.removeItem("vaktram_profile");
+    if (typeof window !== "undefined") {
+      if (profile) {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+      } else {
+        localStorage.removeItem(PROFILE_KEY);
+      }
     }
     set({ profile });
   },
@@ -67,10 +67,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
 
   clear: () => {
-    localStorage.removeItem("vaktram_access_token");
-    localStorage.removeItem("vaktram_refresh_token");
-    localStorage.removeItem("vaktram_profile");
-    document.cookie = "vaktram_token=; path=/; max-age=0";
-    set({ accessToken: null, refreshToken: null, profile: null, isLoading: false });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(PROFILE_KEY);
+      // Legacy keys from the pre-cookie era — clear them once and they're
+      // gone for good.
+      localStorage.removeItem("vaktram_access_token");
+      localStorage.removeItem("vaktram_refresh_token");
+    }
+    set({ accessToken: null, profile: null, isLoading: false });
   },
 }));

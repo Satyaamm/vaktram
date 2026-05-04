@@ -41,6 +41,31 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("JWT_SECRET", "SUPABASE_JWT_SECRET"),
     )
 
+    @field_validator("jwt_secret", mode="after")
+    @classmethod
+    def _validate_jwt_secret(cls, v: str) -> str:
+        # In dev we tolerate empty (auto-generated below); in prod we refuse
+        # to boot without an explicit, sufficiently long secret.
+        import os
+
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        if not v:
+            if env == "production":
+                raise ValueError(
+                    "JWT_SECRET must be set in production. Generate with: "
+                    "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+                )
+            # Dev fallback: deterministic-per-process random so tokens issued
+            # this run remain valid, but they won't survive a restart. This
+            # avoids mysterious 401s during local dev without weakening prod.
+            import secrets as _s
+            return _s.token_urlsafe(64)
+        if len(v) < 32:
+            raise ValueError(
+                f"JWT_SECRET is too short ({len(v)} chars). Use at least 32."
+            )
+        return v
+
     # Upstash Redis
     upstash_redis_url: str = Field(default="", description="Upstash Redis REST URL")
     upstash_redis_token: str = Field(default="", description="Upstash Redis REST token")
@@ -67,6 +92,10 @@ class Settings(BaseSettings):
 
     # Bot / Recording
     bot_service_url: str = Field(default="http://localhost:8001", description="Bot service URL")
+    bot_shared_secret: str = Field(
+        default="",
+        description="Shared secret sent in X-Bot-Auth on every bot-service request",
+    )
     diarization_service_url: str = Field(default="http://localhost:8002", description="Diarization service URL")
 
     # Calendar

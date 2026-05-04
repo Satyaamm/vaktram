@@ -226,7 +226,13 @@ class CalendarService:
         # Check location/description for known meeting URLs
         for field in ("location", "description"):
             text = event.get(field, "") or ""
-            for pattern in ("zoom.us/j/", "meet.google.com/", "teams.microsoft.com/"):
+            for pattern in (
+                "zoom.us/j/",
+                "meet.google.com/",
+                "teams.microsoft.com/",
+                "meeting.zoho.",
+                "meet.zoho.com/",
+            ):
                 if pattern in text:
                     # Extract the URL
                     for word in text.split():
@@ -243,6 +249,8 @@ class CalendarService:
             return MeetingPlatform.zoom
         if "teams.microsoft.com" in url:
             return MeetingPlatform.teams
+        if "meeting.zoho." in url or "meet.zoho.com" in url:
+            return MeetingPlatform.zoho
         return MeetingPlatform.other
 
     async def _upsert_meeting_from_event(

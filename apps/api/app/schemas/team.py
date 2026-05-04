@@ -139,7 +139,9 @@ class SignupResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Optional: modern clients use the HttpOnly refresh cookie instead. Body
+    # is kept for legacy clients (Swagger, the OAuth2 password flow).
+    refresh_token: str | None = None
 
 
 class UserProfileUpdate(BaseModel):

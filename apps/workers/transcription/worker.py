@@ -28,6 +28,8 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL_SECONDS", "5"))
 STORAGE_BUCKET = os.getenv("AUDIO_STORAGE_BUCKET", "meeting-recordings")
 API_URL = os.getenv("API_URL", "http://api:8000")
+BOT_SHARED_SECRET = os.getenv("BOT_SHARED_SECRET", "")
+INTERNAL_HEADERS = {"X-Bot-Auth": BOT_SHARED_SECRET} if BOT_SHARED_SECRET else {}
 
 _shutdown = False
 
@@ -105,6 +107,7 @@ async def poll_for_jobs(processor: TranscriptionProcessor) -> None:
                 async with httpx.AsyncClient() as client:
                     resp = await client.post(
                         f"{API_URL}/internal/meetings/{meeting_id}/transcription-complete",
+                        headers=INTERNAL_HEADERS,
                         json={"segment_count": len(segments)},
                         timeout=10.0,
                     )
@@ -132,6 +135,7 @@ async def poll_for_jobs(processor: TranscriptionProcessor) -> None:
                     async with httpx.AsyncClient() as client:
                         await client.post(
                             f"{API_URL}/internal/meetings/{meeting_id}/pipeline-error",
+                            headers=INTERNAL_HEADERS,
                             json={
                                 "stage": "transcription",
                                 "error": str(exc),

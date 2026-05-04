@@ -59,7 +59,10 @@ export default async function SharedSoundbitePage({
 
         <div className="mt-12 text-xs text-muted-foreground">
           Powered by{" "}
-          <a href="/" className="text-teal-700 hover:underline">
+          <a
+            href={process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram.com"}
+            className="text-teal-700 hover:underline"
+          >
             Vaktram
           </a>{" "}
           — AI meeting intelligence.

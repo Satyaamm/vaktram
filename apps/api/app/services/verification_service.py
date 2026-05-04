@@ -8,6 +8,7 @@ Default lifetime: 24h for verify_email, 30 min for password_reset.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -54,12 +55,18 @@ async def consume(
     Valid only if: hash matches, purpose matches, not expired, not already used.
     Marks `used_at` so it can't be replayed.
     """
+    incoming_hash = _hash(token)
     row = (await db.execute(
         select(EmailVerificationToken)
-        .where(EmailVerificationToken.token_hash == _hash(token))
+        .where(EmailVerificationToken.token_hash == incoming_hash)
         .where(EmailVerificationToken.purpose == purpose)
     )).scalar_one_or_none()
     if row is None:
+        return None
+    # Defense-in-depth: re-compare in constant time. The DB lookup already
+    # uses an exact match on the hash column, but if we ever switch to a
+    # range/prefix query this guards against timing leaks on the hash bytes.
+    if not hmac.compare_digest(row.token_hash, incoming_hash):
         return None
     if row.used_at is not None:
         return None

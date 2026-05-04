@@ -58,6 +58,8 @@ function platformIcon(platform: Meeting["platform"]): string {
       return "Meet";
     case "teams":
       return "Teams";
+    case "zoho":
+      return "Zoho";
     default:
       return "Other";
   }

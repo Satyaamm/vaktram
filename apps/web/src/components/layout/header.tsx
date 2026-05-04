@@ -85,8 +85,13 @@ export function Header() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     queryClient.clear();
+    // Tell the API to revoke the refresh token + clear cookies. We await
+    // best-effort: even if the request fails (offline, server down), we
+    // still want to drop local state and bounce the user.
+    const { logout } = await import("@/lib/api/auth");
+    await logout();
     useAuthStore.getState().clear();
     window.location.href = "/login";
   };
