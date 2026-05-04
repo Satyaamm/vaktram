@@ -22,16 +22,13 @@ export const metadata: Metadata = {
   },
   description:
     "Transcribe, summarize, and extract action items from your meetings. Bring your own LLM for complete privacy and control.",
-  // Favicon: logoshort.png lives at /public. Browsers fall back to the
-  // shipped favicon.ico if the PNG isn't present yet.
-  icons: {
-    icon: [
-      { url: "/logoshort.png", type: "image/png" },
-      { url: "/favicon.ico" },
-    ],
-    shortcut: "/logoshort.png",
-    apple: "/logoshort.png",
-  },
+  // Favicon is generated automatically by Next.js from these files:
+  //   apps/web/src/app/icon.png         → browser tab + most surfaces
+  //   apps/web/src/app/apple-icon.png   → iOS home screen
+  // Drop the same logoshort.png at both paths and Next handles the rest.
+  // No manual conversion, no metadata wiring required. The default
+  // Next.js favicon.ico has been removed so an unbranded tab is the
+  // worst case until your assets land.
 };
 
 export default function RootLayout({
