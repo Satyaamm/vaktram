@@ -5,22 +5,34 @@
 # Usage:
 #     bash infra/scripts/deploy-bot-vps.sh
 #
-# Behavior on every run:
+# Behavior on every run (idempotent — safe to re-run as many times as
+# you want, every prior bot artefact is destroyed before the new build):
+#
 #   1. SSH into the VPS (you'll be prompted for the root password)
 #   2. Install Docker if missing
 #   3. Clone or fast-forward the public repo at /opt/vaktram
 #   4. Write apps/bot-service/.env using secrets read from your LOCAL .env
-#   5. Stop and remove the current container by name (default: 'bot')
-#   6. Stop and remove ANY container holding port 1003 (catches stale
-#      containers under different names — e.g. legacy 'vaktram-bot')
-#   7. Remove old images: 'bot:latest' AND 'vaktram-bot:latest' (legacy)
-#   8. Prune dangling layers
-#   9. Build the image with --no-cache (always fresh)
-#  10. Run the new container with --restart unless-stopped
-#  11. Wait for /health to respond, otherwise tail the logs and exit 1
+#   5. Stop + remove containers named 'bot' or 'vaktram-bot' (legacy)
+#   6. Stop + remove ANY container that holds host port 1003
+#      (catch-all for stale orphans under unexpected names)
+#   7. Remove images 'bot:latest' AND 'vaktram-bot:latest'
+#   8. Prune dangling image layers
+#   9. Prune the docker BUILD CACHE (forces fresh layers next build)
+#  10. Build the image with --no-cache --pull (truly fresh)
+#  11. Run the new container with --restart unless-stopped
+#  12. Wait for /health to respond, otherwise tail the logs and exit 1
 #
-# Re-running is safe — every prior bot artefact (regardless of name) gets
-# torn down before the new build.
+# ─── Safety contract for shared VPS hosts ────────────────────────────
+# This script ONLY touches bot artefacts. It DOES NOT use any of:
+#   docker system prune        ← would nuke everything
+#   docker container prune     ← would remove all stopped containers
+#   docker image prune -a      ← would remove unused images host-wide
+# The image-prune step uses `-f` only (dangling-only). The builder-prune
+# touches only the build cache, which Docker rebuilds on demand and is
+# never tied to a running container.
+#
+# So if your VPS also runs unrelated containers (halovoice, focalboard,
+# rulemind, etc.), this script will leave them completely alone.
 #
 # Override defaults via env vars before invoking:
 #     VPS_HOST=root@<ip>
@@ -145,17 +157,22 @@ for img in "${LEGACY_IMAGES[@]}"; do
     fi
 done
 
-# 7. Prune dangling layers (keeps host disk tidy across re-deploys)
+# 7. Prune dangling layers (keeps host disk tidy across re-deploys).
+#    -f only → dangling images, NEVER images of running containers.
 docker image prune -f >/dev/null 2>&1 || true
 
-# 8. Build with --no-cache (always fresh)
+# 8. Prune the build cache so the next --no-cache build is truly fresh.
+#    Touches only buildx layer cache, never any running container.
+docker builder prune -f >/dev/null 2>&1 || true
+
+# 9. Build with --no-cache --pull (always fresh)
 echo "[VPS] Building image $BOT_IMAGE_NAME (--no-cache, ~3-5 min)..."
 docker build --no-cache --pull \
     -t "$BOT_IMAGE_NAME" \
     -f infra/docker/Dockerfile.bot \
     .
 
-# 9. Run
+# 10. Run
 echo "[VPS] Starting container '$BOT_CONTAINER_NAME'..."
 docker run -d \
     --name "$BOT_CONTAINER_NAME" \
@@ -164,7 +181,7 @@ docker run -d \
     --env-file apps/bot-service/.env \
     "$BOT_IMAGE_NAME" >/dev/null
 
-# 10. Wait for /health
+# 11. Wait for /health
 echo -n "[VPS] Waiting for /health"
 for i in $(seq 1 15); do
     echo -n "."
