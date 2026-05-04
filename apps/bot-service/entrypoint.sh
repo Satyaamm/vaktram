@@ -14,16 +14,49 @@ PULSE_SOCKET="${PULSE_SOCKET:-/tmp/pulseaudio.socket}"
 # Clean any stale socket from previous runs.
 rm -f "$PULSE_SOCKET"
 
-# Start PulseAudio. The --file flag points at our config which loads:
+# CRITICAL: PULSE_SERVER tells *clients* where the daemon lives. The daemon
+# itself, on seeing PULSE_SERVER set, thinks "a daemon is already running
+# at that path" and refuses to start with:
+#   "User-configured server at unix:..., refusing to start/autospawn."
+# Strip the var for the duration of the daemon launch, then restore it
+# below so uvicorn / ffmpeg can connect.
+SAVED_PULSE_SERVER="${PULSE_SERVER:-}"
+unset PULSE_SERVER
+
+# pulseaudio also refuses --start as root unless we either (a) pass
+# --system, which needs a real `pulse` OS user, or (b) set
+# PULSE_RUNTIME_PATH so it stops complaining about the default
+# /run/user/0 path. We take path (b): the warning "not intended to run
+# as root" is benign — what blocks startup is the PULSE_SERVER detection
+# above plus the missing runtime path.
+export PULSE_RUNTIME_PATH="${PULSE_RUNTIME_PATH:-/tmp/pulse-runtime}"
+mkdir -p "$PULSE_RUNTIME_PATH"
+
+# Start PulseAudio explicitly in the background. We use --daemonize rather
+# than --start because --start runs a "server already running?" check via
+# PULSE_SERVER which behaves unpredictably in containers. --daemonize is
+# the unambiguous "fork into the background" path.
+#
+# The --file flag points at our config which loads:
 #   - module-native-protocol-unix on $PULSE_SOCKET
 #   - module-null-sink sink_name=vaktram_sink
 #   - sets vaktram_sink as the default
 pulseaudio \
-  --start \
+  --daemonize=yes \
   --exit-idle-time=-1 \
+  --disallow-exit \
   --file=/etc/pulse/default.pa \
   --log-target=stderr \
-  -vvv
+  -vvv || {
+    echo "pulseaudio --daemonize failed; tailing system logs for context:" >&2
+    pulseaudio --check && echo "(daemon already running)" >&2 || true
+    exit 1
+  }
+
+# Restore PULSE_SERVER for everything we exec from here down (clients).
+if [ -n "$SAVED_PULSE_SERVER" ]; then
+  export PULSE_SERVER="$SAVED_PULSE_SERVER"
+fi
 
 # Wait up to 10s for the socket to appear before starting the API.
 for i in $(seq 1 20); do
