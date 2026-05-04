@@ -77,10 +77,15 @@ async def fetch_bytes(uri_or_path: str) -> bytes:
     """Download audio bytes from any supported source.
 
     Accepts:
-      r2://bucket/key   — Cloudflare R2
-      s3://bucket/key   — any S3-compatible (resolved via the same client)
-      /abs/path         — local filesystem (compose / single-host)
+      supabase://bucket/key  — Supabase Storage (REST API + service role)
+      r2://bucket/key        — Cloudflare R2
+      s3://bucket/key        — any S3-compatible (resolved via boto3)
+      /abs/path              — local filesystem (compose / single-host)
     """
+    if uri_or_path.startswith("supabase://"):
+        bucket, key = _parse_uri(uri_or_path)
+        return await _supabase_get(bucket, key)
+
     if uri_or_path.startswith(("r2://", "s3://")):
         bucket, key = _parse_uri(uri_or_path)
         import asyncio
@@ -89,6 +94,27 @@ async def fetch_bytes(uri_or_path: str) -> bytes:
     # Local file fallback for docker-compose / single-host installs
     with open(uri_or_path, "rb") as f:
         return f.read()
+
+
+async def _supabase_get(bucket: str, key: str) -> bytes:
+    import httpx
+
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    sk = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not base or not sk:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required to fetch supabase:// URIs"
+        )
+    async with httpx.AsyncClient(timeout=120) as c:
+        resp = await c.get(
+            f"{base}/storage/v1/object/{bucket}/{key}",
+            headers={"apikey": sk, "Authorization": f"Bearer {sk}"},
+        )
+        if resp.status_code >= 300:
+            raise RuntimeError(
+                f"Supabase Storage GET failed: HTTP {resp.status_code} — {resp.text[:200]}"
+            )
+        return resp.content
 
 
 def _parse_uri(uri: str) -> tuple[str, str]:
