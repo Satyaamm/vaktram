@@ -6,6 +6,27 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Marketing layout primitives — used by the (marketing) route group */
+  .container-tight {
+    @apply mx-auto w-full max-w-6xl px-6 lg:px-8;
+  }
+  .container-wide {
+    @apply mx-auto w-full max-w-7xl px-6 lg:px-10;
+  }
+  .bg-dot-grid {
+    background-image: radial-gradient(circle, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}
+
+@layer components {
+  /* Marketing typography helpers */
+  .display {
+    @apply text-slate-950 font-bold tracking-[-0.02em] leading-[1.05];
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.2em] text-teal-700;
+  }
 }
 
 @layer base {

@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Mail } from "lucide-react";
 
-import { APP_URL } from "@/lib/config";
-
 const CONTACT_API = process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || "";
 
 interface FormState {
@@ -45,7 +43,7 @@ export default function ContactPage() {
                 <ContactItem
                   label="Already a customer?"
                   value="Sign in to your dashboard"
-                  href={`${APP_URL}/login`}
+                  href="/login"
                 />
               </div>
             </div>

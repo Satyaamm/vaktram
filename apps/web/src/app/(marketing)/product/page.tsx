@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     "How Vaktram works: BYOM-first meeting recording, transcription, search, and summaries — across Google Meet, Zoom, Teams, and Zoho.",
 };
 
-import { APP_URL } from "@/lib/config";
 
 export default function ProductPage() {
   return (
@@ -100,7 +99,7 @@ function Hero() {
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href={`${APP_URL}/signup`}
+              href="/signup"
               className="inline-flex items-center gap-1.5 rounded-md bg-slate-950 px-5 py-3 text-[15px] font-semibold text-white shadow-sm transition-all hover:bg-slate-800"
             >
               Start free
@@ -329,7 +328,7 @@ function CTA() {
         </h2>
         <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
-            href={`${APP_URL}/signup`}
+            href="/signup"
             className="inline-flex items-center gap-1.5 rounded-md bg-white px-5 py-3 text-[15px] font-semibold text-slate-950 transition-colors hover:bg-slate-100"
           >
             Start free

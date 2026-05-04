@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { APP_URL } from "@/lib/config";
+
+// Marketing-site nav. Lives on the same origin as the dashboard, so all
+// links are relative — Sign in routes to /login, "Book a demo" to /contact.
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Product", href: "/product" },
@@ -59,7 +61,7 @@ export function SiteNav() {
 
         <div className="hidden items-center gap-3 md:flex">
           <Link
-            href={`${APP_URL}/login`}
+            href="/login"
             className="text-[14px] font-medium text-slate-700 transition-colors hover:text-slate-950"
           >
             Sign in
@@ -97,7 +99,7 @@ export function SiteNav() {
             ))}
             <li className="mt-2 flex gap-2 px-1">
               <Link
-                href={`${APP_URL}/login`}
+                href="/login"
                 className="flex-1 rounded-md border border-slate-200 px-4 py-2 text-center text-[14px] font-semibold text-slate-700"
               >
                 Sign in

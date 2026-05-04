@@ -16,9 +16,22 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Vaktram - AI Meeting Notes, Your Way",
+  title: {
+    default: "Vaktram — AI meeting notes on the model you choose",
+    template: "%s · Vaktram",
+  },
   description:
     "Transcribe, summarize, and extract action items from your meetings. Bring your own LLM for complete privacy and control.",
+  // Favicon: logoshort.png lives at /public. Browsers fall back to the
+  // shipped favicon.ico if the PNG isn't present yet.
+  icons: {
+    icon: [
+      { url: "/logoshort.png", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/logoshort.png",
+    apple: "/logoshort.png",
+  },
 };
 
 export default function RootLayout({

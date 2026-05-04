@@ -8,7 +8,6 @@ export const metadata: Metadata = {
     "Why teams shipping with their own models choose Vaktram for meeting notes, transcripts, and searchable knowledge.",
 };
 
-import { APP_URL } from "@/lib/config";
 
 interface Story {
   company: string;
@@ -145,7 +144,7 @@ function CTA() {
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            href={`${APP_URL}/signup`}
+            href="/signup"
             className="inline-flex items-center rounded-md border border-white/20 px-5 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-white/5"
           >
             Or start free

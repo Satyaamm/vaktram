@@ -11,8 +11,6 @@ import {
   Zap,
 } from "lucide-react";
 
-import { APP_URL } from "@/lib/config";
-
 // ─────────────────────────────────────────────────────────────────────────
 // Home page sections — modeled on the Pylon flow:
 //   1. Hero with kicker + headline + subhead + dual CTA + product preview
@@ -77,7 +75,7 @@ function Hero() {
 
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href={`${APP_URL}/signup`}
+              href="/signup"
               className="inline-flex items-center gap-1.5 rounded-md bg-slate-950 px-5 py-3 text-[15px] font-semibold text-white shadow-sm transition-all hover:bg-slate-800"
             >
               Start free
@@ -458,7 +456,7 @@ function CTABand() {
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href={`${APP_URL}/signup`}
+              href="/signup"
               className="inline-flex items-center gap-1.5 rounded-md bg-white px-5 py-3 text-[15px] font-semibold text-slate-950 shadow-sm transition-colors hover:bg-slate-100"
             >
               Start free

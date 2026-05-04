@@ -8,7 +8,6 @@ export const metadata: Metadata = {
     "Free for 10 meetings/month. Pro at $12/seat. Team for unlimited meetings + advanced search. Bring your own LLM, pay only for the model you use.",
 };
 
-import { APP_URL } from "@/lib/config";
 
 interface Tier {
   name: string;
@@ -26,7 +25,7 @@ const TIERS: Tier[] = [
     price: "$0",
     cadence: "forever",
     blurb: "For early teams kicking the tyres.",
-    cta: { label: "Start free", href: `${APP_URL}/signup` },
+    cta: { label: "Start free", href: "/signup" },
     features: [
       "10 meetings per month",
       "Bring your own LLM key",
@@ -41,7 +40,7 @@ const TIERS: Tier[] = [
     price: "$12",
     cadence: "per seat / month",
     blurb: "For everyday work that needs to be findable later.",
-    cta: { label: "Start trial", href: `${APP_URL}/signup?plan=pro` },
+    cta: { label: "Start trial", href: "/signup?plan=pro" },
     features: [
       "Unlimited meetings",
       "Bring your own LLM key",

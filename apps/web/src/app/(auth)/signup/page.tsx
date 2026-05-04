@@ -6,13 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, Eye, EyeOff, Key, Loader2, MailCheck } from "lucide-react";
-import { signup, AuthError } from "@/lib/api/auth";
 
-// Marketing site lives at a separate Vercel project (apps/website). Legal
-// pages linked from auth flows resolve there. Override via Vercel env in
-// production; fallback matches the expected default project URL.
-const WEBSITE_URL =
-  process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram-website.vercel.app";
+import { signup, AuthError } from "@/lib/api/auth";
+import { Logo } from "@/components/brand/logo";
 
 // Client-side validation mirrors the server's Pydantic rules. The server
 // remains the source of truth — these checks just provide instant feedback.
@@ -155,7 +151,8 @@ export default function SignupPage() {
 
   if (done) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-7">
+        <Logo variant="short" tone="light" href={undefined} />
         <header className="space-y-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-md bg-teal-50 text-teal-700">
             <MailCheck className="h-6 w-6" />
@@ -204,8 +201,9 @@ export default function SignupPage() {
 
   return (
     <div className="space-y-8">
+      <Logo variant="short" tone="light" href={undefined} />
       <header className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-950">
           Create your account
         </h2>
         <p className="text-sm text-slate-500">
@@ -384,23 +382,13 @@ export default function SignupPage() {
 
         <p className="text-center text-xs leading-relaxed text-slate-500">
           By creating an account you agree to our{" "}
-          <a
-            href={`${WEBSITE_URL}/terms`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-slate-900"
-          >
+          <Link href="/terms" className="underline hover:text-slate-900">
             Terms
-          </a>{" "}
+          </Link>{" "}
           and{" "}
-          <a
-            href={`${WEBSITE_URL}/privacy`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-slate-900"
-          >
+          <Link href="/privacy" className="underline hover:text-slate-900">
             Privacy Policy
-          </a>
+          </Link>
           .
         </p>
       </form>

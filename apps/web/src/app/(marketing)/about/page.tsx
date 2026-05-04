@@ -8,7 +8,6 @@ export const metadata: Metadata = {
     "Vaktram is a meeting-notes platform built for teams that want to own their model and their data.",
 };
 
-import { APP_URL } from "@/lib/config";
 
 export default function AboutPage() {
   return (
