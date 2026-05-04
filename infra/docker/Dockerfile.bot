@@ -50,9 +50,9 @@ RUN chmod +x /entrypoint.sh
 
 ENV PULSE_SERVER=unix:/tmp/pulseaudio.socket
 ENV HEADLESS=true
-ENV BOT_SERVICE_PORT=8001
+ENV BOT_SERVICE_PORT=1003
 
-EXPOSE 8001
+EXPOSE 1003
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:${BOT_SERVICE_PORT}/health || exit 1

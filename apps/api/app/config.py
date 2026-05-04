@@ -91,7 +91,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=60, description="Requests per minute per user")
 
     # Bot / Recording
-    bot_service_url: str = Field(default="http://localhost:8001", description="Bot service URL")
+    bot_service_url: str = Field(default="http://localhost:1003", description="Bot service URL")
     bot_shared_secret: str = Field(
         default="",
         description="Shared secret sent in X-Bot-Auth on every bot-service request",

@@ -90,7 +90,7 @@ These are all read by `apps/api/app/config.py` (Pydantic Settings):
 | `UPSTASH_REDIS_URL` + `UPSTASH_REDIS_TOKEN` | ✅ | rate-limit + refresh-jti revocation |
 | `QSTASH_TOKEN` | ✅ | publish pipeline jobs |
 | `QSTASH_CURRENT_SIGNING_KEY` + `QSTASH_NEXT_SIGNING_KEY` | ✅ | webhook signature verify; both supported for rotation |
-| `BOT_SERVICE_URL` | ✅ | e.g. `http://212.38.94.234:8001` |
+| `BOT_SERVICE_URL` | ✅ | e.g. `http://212.38.94.234:1003` |
 | `DIARIZATION_SERVICE_URL` | optional | omit and the pipeline skips diarization |
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | only if calendar sync is enabled |
 | `STRIPE_API_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_*` | optional | billing flows |
@@ -200,30 +200,30 @@ What it does (`infra/scripts/deploy-bot-vps.sh`):
 1. SSH to `root@212.38.94.234` (prompts for password)
 2. Installs Docker if missing
 3. Clones (or hard-resets) the repo at `/opt/vaktram`
-4. Writes `apps/bot-service/.env` (root-owned, 0600) with: `API_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BOT_SHARED_SECRET`, `STORAGE_BUCKET=vaktram-audio`, `HEADLESS=true`, `BOT_MAX_DURATION_SEC=10800`, `BOT_END_CHECK_INTERVAL_SEC=10`, `REGION=ap-southeast-1`, `BOT_SERVICE_PORT=8001`
+4. Writes `apps/bot-service/.env` (root-owned, 0600) with: `API_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BOT_SHARED_SECRET`, `STORAGE_BUCKET=vaktram-audio`, `HEADLESS=true`, `BOT_MAX_DURATION_SEC=10800`, `BOT_END_CHECK_INTERVAL_SEC=10`, `REGION=ap-southeast-1`, `BOT_SERVICE_PORT=1003`
 5. Stops + removes the existing `vaktram-bot` container
 6. Removes the previous `vaktram-bot:latest` image
 7. Prunes dangling Docker layers
 8. Builds `--no-cache --pull` (3-5 min)
-9. Runs the new container (`--restart unless-stopped`, port 8001)
-10. Polls `http://localhost:8001/health` for up to 45 s; on success, prints status; on failure, dumps the last 50 log lines
+9. Runs the new container (`--restart unless-stopped`, port 1003)
+10. Polls `http://localhost:1003/health` for up to 45 s; on success, prints status; on failure, dumps the last 50 log lines
 
 ### Verify externally
 
 ```bash
-curl http://212.38.94.234:8001/health
+curl http://212.38.94.234:1003/health
 # Expected: {"status":"healthy","active_bots":0,"version":"0.1.0"}
 ```
 
 If you get connection-refused, open the firewall:
 
 ```bash
-ssh root@212.38.94.234 'ufw allow 8001/tcp'
+ssh root@212.38.94.234 'ufw allow 1003/tcp'
 ```
 
 ### After bot is up
 
-- Render API → confirm `BOT_SERVICE_URL=http://212.38.94.234:8001` and `BOT_SHARED_SECRET=<value>` are set, redeploy if changed.
+- Render API → confirm `BOT_SERVICE_URL=http://212.38.94.234:1003` and `BOT_SHARED_SECRET=<value>` are set, redeploy if changed.
 - Schedule a Google Meet to validate end-to-end.
 
 ---
@@ -298,13 +298,13 @@ After every fresh deploy:
 
 - [ ] `curl https://vaktram-api.onrender.com/health` → `{"status":"ok"}`
 - [ ] `curl https://vaktram-api.onrender.com/healthz` → `{"status":"ok","database":"connected"}`
-- [ ] `curl http://212.38.94.234:8001/health` → bot healthy
+- [ ] `curl http://212.38.94.234:1003/health` → bot healthy
 - [ ] Browse to `https://vaktram-web.vercel.app/` → marketing renders
 - [ ] Sign up → verification email received → click link → land on `/settings/ai-config?from=verify`
 - [ ] Add a BYOM key → save → AI config status flips to `configured: true`
 - [ ] Schedule a Google Meet → bot dispatches → audio captured → transcript + summary land
 
-If any step fails, the relevant sub-system is the suspect: `/health` for the API, `/healthz` for the DB, `:8001/health` for the bot, the dashboard for the frontend.
+If any step fails, the relevant sub-system is the suspect: `/health` for the API, `/healthz` for the DB, `:1003/health` for the bot, the dashboard for the frontend.
 
 ---
 

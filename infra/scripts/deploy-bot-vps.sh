@@ -10,23 +10,29 @@
 #   2. Install Docker if missing
 #   3. Clone or fast-forward the public repo at /opt/vaktram
 #   4. Write apps/bot-service/.env using secrets read from your LOCAL .env
-#   5. Stop and remove any existing container named 'vaktram-bot'
-#   6. Build the bot image with --no-cache (always a fresh build)
-#   7. Run the new container with --restart unless-stopped
-#   8. Wait for /health to respond, otherwise tail the logs and exit 1
+#   5. Stop and remove the current container by name (default: 'bot')
+#   6. Stop and remove ANY container holding port 1003 (catches stale
+#      containers under different names — e.g. legacy 'vaktram-bot')
+#   7. Remove old images: 'bot:latest' AND 'vaktram-bot:latest' (legacy)
+#   8. Prune dangling layers
+#   9. Build the image with --no-cache (always fresh)
+#  10. Run the new container with --restart unless-stopped
+#  11. Wait for /health to respond, otherwise tail the logs and exit 1
 #
-# Re-running the script is idempotent — old container is always destroyed
-# before a new one is built, so you can iterate freely.
+# Re-running is safe — every prior bot artefact (regardless of name) gets
+# torn down before the new build.
 #
 # Override defaults via env vars before invoking:
 #     VPS_HOST=root@<ip>
-#     CONTAINER_NAME=vaktram-bot
+#     CONTAINER_NAME=bot
+#     IMAGE_NAME=bot:latest
 #     LOCAL_ENV=/path/to/.env
 # ─────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 VPS_HOST="${VPS_HOST:-root@212.38.94.234}"
-CONTAINER_NAME="${CONTAINER_NAME:-vaktram-bot}"
+CONTAINER_NAME="${CONTAINER_NAME:-bot}"
+IMAGE_NAME="${IMAGE_NAME:-bot:latest}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LOCAL_ENV="${LOCAL_ENV:-$REPO_ROOT/.env}"
@@ -64,9 +70,15 @@ REMOTE=$(cat <<'REMOTE_EOF'
 set -euo pipefail
 
 : "${BOT_CONTAINER_NAME:?missing}"
+: "${BOT_IMAGE_NAME:?missing}"
 : "${BOT_SUPABASE_URL:?missing}"
 : "${BOT_SUPABASE_KEY:?missing}"
 : "${BOT_AUTH_SECRET:?missing}"
+
+# Names of containers + images we may have created in past deploys. The
+# script removes ALL of them so renames don't strand orphan containers.
+LEGACY_NAMES=("bot" "vaktram-bot")
+LEGACY_IMAGES=("bot:latest" "vaktram-bot:latest")
 
 # 1. Docker
 if ! command -v docker >/dev/null 2>&1; then
@@ -100,51 +112,66 @@ PULSE_SERVER=unix:/tmp/pulseaudio.socket
 BOT_MAX_DURATION_SEC=10800
 BOT_END_CHECK_INTERVAL_SEC=10
 REGION=ap-southeast-1
-BOT_SERVICE_PORT=8001
+BOT_SERVICE_PORT=1003
 BOT_SHARED_SECRET=$BOT_AUTH_SECRET
 ENVEOF
 echo "[VPS] .env written (mode 0600)."
 
-# 4. Tear down any existing container with the same name
-if docker ps -aq -f "name=^${BOT_CONTAINER_NAME}$" | grep -q .; then
-    echo "[VPS] Stopping and removing existing container '$BOT_CONTAINER_NAME'..."
-    docker stop "$BOT_CONTAINER_NAME" >/dev/null 2>&1 || true
-    docker rm -f "$BOT_CONTAINER_NAME" >/dev/null
+# 4. Tear down all known previous containers (by name)
+for name in "${LEGACY_NAMES[@]}"; do
+    if docker ps -aq -f "name=^${name}$" | grep -q .; then
+        echo "[VPS] Removing container by name: '$name'..."
+        docker stop "$name" >/dev/null 2>&1 || true
+        docker rm -f "$name" >/dev/null 2>&1 || true
+    fi
+done
+
+# 5. Catch-all: kill anything else still bound to port 1003. Without this
+#    a stale orphan blocks `docker run -p 1003:1003` with the cryptic
+#    "port is already allocated" error users hit before this fix.
+HOLDERS=$(docker ps -aq --filter "publish=1003" 2>/dev/null || true)
+if [ -n "$HOLDERS" ]; then
+    echo "[VPS] Removing leftover container(s) holding port 1003:"
+    docker ps -a --filter "publish=1003" --format "         {{.Names}}  ({{.ID}})  {{.Status}}"
+    # shellcheck disable=SC2086
+    docker rm -f $HOLDERS >/dev/null 2>&1 || true
 fi
 
-# 5. Remove the previous image so the next build is truly fresh
-if docker images -q vaktram-bot:latest | grep -q .; then
-    echo "[VPS] Removing previous vaktram-bot:latest image..."
-    docker rmi -f vaktram-bot:latest >/dev/null 2>&1 || true
-fi
+# 6. Remove old images (both new + legacy names) so build is truly fresh
+for img in "${LEGACY_IMAGES[@]}"; do
+    if docker images -q "$img" | grep -q .; then
+        echo "[VPS] Removing previous image: '$img'..."
+        docker rmi -f "$img" >/dev/null 2>&1 || true
+    fi
+done
 
-# 6. Prune dangling layers (keeps the host tidy across re-deploys)
+# 7. Prune dangling layers (keeps host disk tidy across re-deploys)
 docker image prune -f >/dev/null 2>&1 || true
 
-# 7. Build with --no-cache (always fresh)
-echo "[VPS] Building image vaktram-bot:latest (--no-cache, ~3-5 min)..."
+# 8. Build with --no-cache (always fresh)
+echo "[VPS] Building image $BOT_IMAGE_NAME (--no-cache, ~3-5 min)..."
 docker build --no-cache --pull \
-    -t vaktram-bot:latest \
+    -t "$BOT_IMAGE_NAME" \
     -f infra/docker/Dockerfile.bot \
     .
 
-# 8. Run
+# 9. Run
 echo "[VPS] Starting container '$BOT_CONTAINER_NAME'..."
 docker run -d \
     --name "$BOT_CONTAINER_NAME" \
     --restart unless-stopped \
-    -p 8001:8001 \
+    -p 1003:1003 \
     --env-file apps/bot-service/.env \
-    vaktram-bot:latest >/dev/null
+    "$BOT_IMAGE_NAME" >/dev/null
 
-# 9. Wait for /health
+# 10. Wait for /health
 echo -n "[VPS] Waiting for /health"
 for i in $(seq 1 15); do
     echo -n "."
-    if curl -fsS http://localhost:8001/health >/dev/null 2>&1; then
+    if curl -fsS http://localhost:1003/health >/dev/null 2>&1; then
         echo
         echo "[VPS] ✓ Bot healthy:"
-        curl -s http://localhost:8001/health | sed 's/^/         /'
+        curl -s http://localhost:1003/health | sed 's/^/         /'
         echo
         echo "[VPS] Container status:"
         docker ps --filter "name=^${BOT_CONTAINER_NAME}$" --format "         {{.Names}}  {{.Status}}  {{.Ports}}"
@@ -160,14 +187,15 @@ REMOTE_EOF
 )
 
 # ── Prepend the locally-resolved values, then ship to remote ─────────────
-PAYLOAD="$(printf 'export BOT_CONTAINER_NAME=%q\nexport BOT_SUPABASE_URL=%q\nexport BOT_SUPABASE_KEY=%q\nexport BOT_AUTH_SECRET=%q\n%s\n' \
+PAYLOAD="$(printf 'export BOT_CONTAINER_NAME=%q\nexport BOT_IMAGE_NAME=%q\nexport BOT_SUPABASE_URL=%q\nexport BOT_SUPABASE_KEY=%q\nexport BOT_AUTH_SECRET=%q\n%s\n' \
     "$CONTAINER_NAME" \
+    "$IMAGE_NAME" \
     "$SUPABASE_URL_VAL" \
     "$SUPABASE_SERVICE_ROLE_KEY" \
     "$BOT_SHARED_SECRET" \
     "$REMOTE")"
 
-echo "→ Deploying '$CONTAINER_NAME' to $VPS_HOST"
+echo "→ Deploying container='$CONTAINER_NAME' image='$IMAGE_NAME' to $VPS_HOST"
 echo "→ You'll be prompted for the SSH password..."
 echo
 
@@ -177,8 +205,8 @@ echo
 echo "✓ Deploy complete."
 echo
 echo "Next steps:"
-echo "  • Confirm reachable:  curl http://${VPS_HOST#root@}:8001/health"
+echo "  • Confirm reachable:  curl http://${VPS_HOST#root@}:1003/health"
 echo "  • Tail logs:          ssh $VPS_HOST 'docker logs -f $CONTAINER_NAME'"
 echo "  • Restart container:  ssh $VPS_HOST 'docker restart $CONTAINER_NAME'"
-echo "  • Update Render env:  BOT_SERVICE_URL=http://${VPS_HOST#root@}:8001"
+echo "  • Update Render env:  BOT_SERVICE_URL=http://${VPS_HOST#root@}:1003"
 echo "    (then it will use the new bot URL on the next API redeploy)"

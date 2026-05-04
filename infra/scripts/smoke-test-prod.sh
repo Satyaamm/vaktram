@@ -22,7 +22,7 @@ set -uo pipefail
 
 API="${API_URL:-https://vaktram-api.onrender.com}"
 WEB="${WEB_URL:-https://vaktram-web.vercel.app}"
-BOT="${BOT_URL:-http://212.38.94.234:8001}"
+BOT="${BOT_URL:-http://212.38.94.234:1003}"
 
 GREEN=$'\033[32m'; RED=$'\033[31m'; DIM=$'\033[2m'; RESET=$'\033[0m'
 pass() { echo "  ${GREEN}✓${RESET} $1"; }
@@ -59,7 +59,7 @@ code=$(curl -s -m 5 -o /tmp/.bot-h -w "%{http_code}" "$BOT/health")
 if [ "$code" = "200" ]; then
   pass "/health → 200 ($(cat /tmp/.bot-h))"
 else
-  fail "/health → $code (deploy-bot-vps.sh not run, or :8001 not open in firewall)"
+  fail "/health → $code (deploy-bot-vps.sh not run, or :1003 not open in firewall)"
 fi
 
 hdr "CORS"

@@ -5,7 +5,7 @@ Provides endpoints to start/stop bots, check health, and manage sessions.
 Auth model: every endpoint except /health requires the
 `X-Bot-Auth` header to match `BOT_SHARED_SECRET`. The Vaktram API knows
 the same secret and includes it on every dispatch. Without this gate the
-service is fully exposed to the internet (port 8001 on the VPS) and any
+service is fully exposed to the internet (port 1003 on the VPS) and any
 attacker can spawn bots into arbitrary meetings or stop existing ones.
 """
 

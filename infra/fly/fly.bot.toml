@@ -9,14 +9,14 @@ primary_region = "iad"
   dockerfile = "../../infra/docker/Dockerfile.bot"
 
 [env]
-  PORT = "8001"
+  PORT = "1003"
   HEADLESS = "true"
   PULSE_SERVER = "unix:/tmp/pulseaudio.socket"
   BOT_MAX_DURATION_SEC = "10800"
   BOT_END_CHECK_INTERVAL_SEC = "10"
 
 [http_service]
-  internal_port = 8001
+  internal_port = 1003
   force_https = true
   auto_stop_machines = "stop"     # idle machines power down
   auto_start_machines = true       # restart on /bots/start

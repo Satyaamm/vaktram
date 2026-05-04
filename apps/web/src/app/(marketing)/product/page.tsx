@@ -178,7 +178,7 @@ function CapabilityVisual({ kicker }: { kicker: string }) {
         <ul className="mt-4 space-y-2.5 text-[13.5px]">
           {[
             ["10:59:54", "Calendar event detected — Q4 Planning Sync"],
-            ["10:59:56", "Bot dispatched to vps://212.38.94.234:8001"],
+            ["10:59:56", "Bot dispatched to vps://212.38.94.234:1003"],
             ["11:00:01", "Joined Google Meet as 'Vaktram Notetaker'"],
             ["11:00:04", "Consent posted to chat"],
             ["11:00:05", "Recording started · vaktram_sink"],

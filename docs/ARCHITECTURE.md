@@ -12,7 +12,7 @@ Vaktram is a meeting-notes platform with **bring-your-own-model (BYOM)** for the
 |---|---|---|---|---|
 | **API** | `apps/api/app/main.py:51` | 8000 | Render (Docker) | Postgres, Redis, QStash, bot, workers, Resend, Groq |
 | **Dashboard + marketing** | `apps/web/src/app/layout.tsx` | 3000 | Vercel | API |
-| **Bot service** | `apps/bot-service/bot/main.py:45` | 8001 | VPS Docker (`212.38.94.234`) | API (callback), Supabase Storage, Playwright/Chromium |
+| **Bot service** | `apps/bot-service/bot/main.py:45` | 1003 | VPS Docker (`212.38.94.234`) | API (callback), Supabase Storage, Playwright/Chromium |
 | **Transcription worker** | `apps/workers/transcription/worker.py` | — (poll) | Docker / Render BG / Fly | Supabase Storage, API, Groq Whisper |
 | **Summarizer worker** | `apps/workers/summarizer/worker.py` | — (poll) | Docker / Render BG / Fly | Supabase, API, user's BYOM LLM |
 | **Diarization** | `apps/workers/diarization/main.py` | 8002 | Docker (optional) | API, pyannote 3.1 (HF) |

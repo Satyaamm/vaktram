@@ -52,4 +52,4 @@ fi
 echo "PulseAudio ready. Default sink:"
 pactl get-default-sink || true
 
-exec uvicorn bot.main:app --host 0.0.0.0 --port "${BOT_SERVICE_PORT:-8001}"
+exec uvicorn bot.main:app --host 0.0.0.0 --port "${BOT_SERVICE_PORT:-1003}"

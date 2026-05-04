@@ -92,7 +92,7 @@ npm run dev   # http://localhost:3000
 # 6. (optional) Run the bot locally — needs Playwright + PulseAudio
 cd apps/bot-service
 pip install -r requirements.txt
-python -m bot.main  # http://localhost:8001
+python -m bot.main  # http://localhost:1003
 ```
 
 The dev pipeline falls back to inline async tasks when QStash isn't configured — fine for solo dev. **Production refuses to boot without QStash signing keys**.
