@@ -56,19 +56,28 @@ def _button(text: str, href: str) -> str:
 
 def welcome(*, full_name: str | None) -> tuple[str, str, str]:
     name = full_name.split(" ")[0] if full_name else "there"
-    subject = f"Welcome to {BRAND}"
+    subject = f"Welcome to {BRAND} — one thing before you start"
     body = f"""
         <p>Hi {_html.escape(name)},</p>
-        <p>Welcome to {BRAND}. You're 3 steps away from your first AI-summarized meeting:</p>
+        <p>Welcome to {BRAND}.</p>
+        <p style="background:#fffbeb;border-left:4px solid #f59e0b;padding:12px 16px;margin:16px 0;border-radius:4px">
+          <b>Heads up:</b> {BRAND} is <b>bring-your-own-model</b>.
+          You need to add an LLM API key (OpenAI, Anthropic, Gemini, Groq,
+          AWS Bedrock, or Vertex AI) before summaries, search, or the AI
+          assistant will work. <b>{BRAND} never charges you for AI usage</b> —
+          you pay your provider directly.
+        </p>
+        <p>Three steps to your first AI-summarized meeting:</p>
         <ol style="line-height:1.8">
+          <li><a href="{APP_URL}/settings/ai-config" style="color:{PRIMARY}"><b>Add your LLM key</b></a> — required, takes 30 seconds.</li>
           <li><a href="{APP_URL}/settings" style="color:{PRIMARY}">Connect your calendar</a> — we'll auto-join your scheduled meetings.</li>
-          <li><a href="{APP_URL}/settings/ai-config" style="color:{PRIMARY}">Plug in your LLM key</a> — pick OpenAI, Anthropic, Gemini, Groq, or Bedrock.</li>
-          <li>Hold a meeting. We'll send you the transcript + summary the moment it's ready.</li>
+          <li>Hold a meeting. The transcript + summary land the moment it's ready.</li>
         </ol>
-        <p style="margin-top:24px">{_button("Open the dashboard", APP_URL + "/dashboard")}</p>
+        <p style="margin-top:24px">{_button("Add my LLM key now", APP_URL + "/settings/ai-config?from=welcome")}</p>
     """
     return subject, _frame(f"Welcome, {name}", body), (
-        f"Welcome to {BRAND}. Get started: {APP_URL}/dashboard"
+        f"Welcome to {BRAND}. {BRAND} is BYOM — add your LLM API key first: "
+        f"{APP_URL}/settings/ai-config"
     )
 
 
@@ -104,6 +113,13 @@ def email_verification(*, full_name: str | None, verify_url: str) -> tuple[str, 
         <p>Hi {_html.escape(name)},</p>
         <p>Confirm your email so you can start using {BRAND}. The link expires in 24 hours.</p>
         <p style="margin-top:16px">{_button("Verify email", verify_url)}</p>
+        <p style="background:#f1f5f9;padding:10px 14px;border-radius:6px;font-size:13px;color:#475569;margin-top:20px">
+          <b>Quick heads-up:</b> {BRAND} is <b>bring-your-own-model</b>. Once you
+          verify, you'll need to paste an LLM API key (OpenAI, Anthropic,
+          Gemini, Groq, or Bedrock) before summaries and AI features work.
+          {BRAND} never charges you for AI usage — you pay your provider
+          directly.
+        </p>
         <p style="font-size:12px;color:#64748b;margin-top:24px">
           If you didn't sign up for {BRAND}, you can ignore this — no account will be created.
         </p>

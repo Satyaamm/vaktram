@@ -57,7 +57,12 @@ function VerifyEmailInner() {
         setTokens(tokens.access_token, tokens.refresh_token);
         setProfile(tokens.user);
         setStatus("success");
-        setTimeout(() => router.push("/dashboard"), 1200);
+        // Land brand-new users on AI config (BYOM is required to use anything),
+        // not the empty dashboard. Existing users go to /dashboard.
+        setTimeout(
+          () => router.push("/settings/ai-config?from=verify"),
+          1200,
+        );
       } catch (e) {
         if (cancelled) return;
         setStatus("error");

@@ -878,6 +878,41 @@ function SavedConfigsList({
 // Main Page
 // ---------------------------------------------------------------------------
 
+function FromVerifyBanner() {
+  // Renders a strong "you've just verified — now add your key" banner when
+  // the user lands here from /verify-email or the welcome email.
+  // Read on mount only so SSR/CSR match.
+  const [show, setShow] = useState(false);
+  useState(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setShow(params.get("from") === "verify" || params.get("from") === "welcome");
+  });
+  if (!show) return null;
+  return (
+    <Card className="border-2 border-teal-300 bg-teal-50">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-700 text-white">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold text-teal-950">
+              Your email is verified — one last step to start using Vaktram
+            </p>
+            <p className="text-sm text-teal-900 mt-1 leading-relaxed">
+              Vaktram is <b>bring-your-own-model</b>. Pick a provider below
+              and paste your API key. We never charge you for AI usage —
+              your key calls your provider directly. Without this, summaries,
+              Ask Vakta, and semantic search will not work.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AIConfigPage() {
   const [editingConfig, setEditingConfig] = useState<UserAIConfig | null>(null);
   const [showForm, setShowForm] = useState(true);
@@ -889,6 +924,8 @@ export default function AIConfigPage() {
 
   return (
     <div className="space-y-6">
+      <FromVerifyBanner />
+
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/settings">
@@ -901,7 +938,7 @@ export default function AIConfigPage() {
             AI Configuration
           </h1>
           <p className="text-muted-foreground mt-1">
-            Bring Your Own Model (BYOM) -- connect your preferred LLM provider
+            <b>Required to use Vaktram.</b> Bring Your Own Model — connect your preferred LLM provider
             for meeting summaries, action items, and insights.
           </p>
         </div>
