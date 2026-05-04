@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { ArrowLeft, Brain, Calendar, Search } from "lucide-react";
 
 // Marketing surface lives at a separate origin (apps/website). The "Home"
