@@ -473,7 +473,7 @@ function ConfigForm({
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const err = validate();
     if (err) {
@@ -481,6 +481,53 @@ function ConfigForm({
       return;
     }
     const payload = buildPayload();
+
+    // Verify the credential against the provider before persisting it. We
+    // skip this when the user is editing an existing config without
+    // changing the key — there's no plaintext to test, and the saved key
+    // already worked at create time. Otherwise we send a "Say hello in
+    // exactly 3 words." prompt and refuse to save unless it succeeds, so
+    // a wrong key fails fast with a clear inline message instead of
+    // surfacing during summarisation hours later.
+    const skipVerify = editingConfig && !payload.api_key;
+    if (!skipVerify) {
+      setIsTesting(true);
+      setTestResult(null);
+      try {
+        const result = await testAIConfig({
+          provider: payload.provider,
+          model_name: payload.model_name,
+          api_key: payload.api_key,
+          base_url: payload.base_url,
+          extra_config: payload.extra_config,
+        });
+        setTestResult(result);
+        if (!result.success) {
+          toast({
+            title: "Key verification failed",
+            description: "Fix the credential and try again — nothing was saved.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch {
+        const failure: TestResult = {
+          success: false,
+          message:
+            "Could not reach the provider. Check your network and credentials.",
+        };
+        setTestResult(failure);
+        toast({
+          title: "Key verification failed",
+          description: failure.message,
+          variant: "destructive",
+        });
+        return;
+      } finally {
+        setIsTesting(false);
+      }
+    }
+
     if (editingConfig) {
       updateMutation.mutate(payload);
     } else {
@@ -670,10 +717,18 @@ function ConfigForm({
             <Button
               type="submit"
               className="bg-teal-700 hover:bg-teal-800 text-white"
-              disabled={isSaving || !selectedProvider}
+              disabled={isSaving || isTesting || !selectedProvider}
             >
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingConfig ? "Update Configuration" : "Save Configuration"}
+              {(isSaving || isTesting) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {isTesting
+                ? "Verifying key…"
+                : isSaving
+                ? "Saving…"
+                : editingConfig
+                ? "Verify & update"
+                : "Verify & save"}
             </Button>
           </div>
         </CardFooter>
