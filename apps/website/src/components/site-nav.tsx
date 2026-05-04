@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_URL } from "@/lib/config";
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Product", href: "/product" },
@@ -12,8 +13,6 @@ const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Security", href: "/security" },
   { label: "About", href: "/about" },
 ];
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.vaktram.com";
 
 export function SiteNav() {
   const [scrolled, setScrolled] = useState(false);

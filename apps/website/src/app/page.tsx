@@ -11,7 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.vaktram.com";
+import { APP_URL } from "@/lib/config";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Home page sections — modeled on the Pylon flow:

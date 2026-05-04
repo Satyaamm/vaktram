@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "Free for 10 meetings/month. Pro at $12/seat. Team for unlimited meetings + advanced search. Bring your own LLM, pay only for the model you use.",
 };
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.vaktram.com";
+import { APP_URL } from "@/lib/config";
 
 interface Tier {
   name: string;

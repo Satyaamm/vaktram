@@ -3,15 +3,7 @@ import "./globals.css";
 
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
-
-// SITE_URL drives the canonical URL embedded in OG/Twitter cards. On Vercel
-// without a custom domain, set NEXT_PUBLIC_SITE_URL to your project's
-// deployment URL (e.g. https://vaktram-website.vercel.app). Falls back to
-// VERCEL_URL (auto-set by Vercel) so previews still produce valid metadata,
-// then to localhost for dev.
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3001");
+import { SITE_URL } from "@/lib/config";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

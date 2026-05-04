@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     "How Vaktram works: BYOM-first meeting recording, transcription, search, and summaries — across Google Meet, Zoom, Teams, and Zoho.",
 };
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.vaktram.com";
+import { APP_URL } from "@/lib/config";
 
 export default function ProductPage() {
   return (

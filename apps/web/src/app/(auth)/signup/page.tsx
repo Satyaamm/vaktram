@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, Eye, EyeOff, Key, Loader2, MailCheck } from "lucide-react";
 import { signup, AuthError } from "@/lib/api/auth";
 
-// Marketing site lives at a separate domain (apps/website). Legal pages
-// linked from auth flows resolve there.
+// Marketing site lives at a separate Vercel project (apps/website). Legal
+// pages linked from auth flows resolve there. Override via Vercel env in
+// production; fallback matches the expected default project URL.
 const WEBSITE_URL =
-  process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram.com";
+  process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram-website.vercel.app";
 
 // Client-side validation mirrors the server's Pydantic rules. The server
 // remains the source of truth — these checks just provide instant feedback.

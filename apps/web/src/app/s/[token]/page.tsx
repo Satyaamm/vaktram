@@ -60,7 +60,7 @@ export default async function SharedSoundbitePage({
         <div className="mt-12 text-xs text-muted-foreground">
           Powered by{" "}
           <a
-            href={process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram.com"}
+            href={process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram-website.vercel.app"}
             className="text-teal-700 hover:underline"
           >
             Vaktram

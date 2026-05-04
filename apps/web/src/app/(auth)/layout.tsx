@@ -3,10 +3,13 @@
 import { useEffect } from "react";
 import { ArrowLeft, Brain, Calendar, Search } from "lucide-react";
 
-// Marketing surface lives at a separate origin (apps/website). The "Home"
-// link from auth pages goes there, not to a stub on app.vaktram.com.
+// Marketing surface lives at a separate Vercel project (apps/website). The
+// "Home" link from auth pages goes there. Set NEXT_PUBLIC_WEBSITE_URL on
+// this project once the marketing site is deployed; the fallback is the
+// expected default Vercel project URL so links don't silently go to a
+// domain you don't own.
 const WEBSITE_URL =
-  process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram.com";
+  process.env.NEXT_PUBLIC_WEBSITE_URL || "https://vaktram-website.vercel.app";
 
 export default function AuthLayout({
   children,

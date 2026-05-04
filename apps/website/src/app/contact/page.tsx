@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Loader2, Mail } from "lucide-react";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.vaktram.com";
+import { APP_URL } from "@/lib/config";
+
 const CONTACT_API = process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || "";
 
 interface FormState {

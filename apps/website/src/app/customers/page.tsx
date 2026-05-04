@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "Why teams shipping with their own models choose Vaktram for meeting notes, transcripts, and searchable knowledge.",
 };
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.vaktram.com";
+import { APP_URL } from "@/lib/config";
 
 interface Story {
   company: string;
