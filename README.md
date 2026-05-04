@@ -1,141 +1,214 @@
-# Vaktram (वक्त्रम्) — The Voice
+# Vaktram
 
-AI-powered meeting notes platform with BYOM (Bring Your Own Model) support. Record, transcribe, and summarize your meetings automatically.
+> **AI meeting notes on the model you choose.** Vaktram joins your Google Meet, Zoom, Teams, and Zoho calls, transcribes them, and summarises with **your** LLM provider — Gemini, OpenAI, Claude, Mistral, anything LiteLLM-compatible. Your keys, your data, your spend.
 
-## Features
+[![Deploy: Vercel](https://img.shields.io/badge/web-vaktram--web.vercel.app-black?logo=vercel)](https://vaktram-web.vercel.app)
+[![Deploy: Render](https://img.shields.io/badge/api-render-46e3b7?logo=render)](https://render.com)
+[![Built in](https://img.shields.io/badge/built%20in-India-fb923c)](#)
 
-- AI bot joins Google Meet / Zoom / Teams meetings
-- Real-time transcription with speaker diarization
-- AI-generated summaries, action items, decisions, follow-ups
-- BYOM: Connect your own LLM (OpenAI, Claude, Gemini, Groq, Azure, Bedrock, etc.)
-- Semantic search across all meetings
-- Audio playback synced with transcript
-- Calendar integration for auto-join
-- Meeting analytics dashboard
-- Team collaboration with shared workspaces
-- Enterprise: SSO, RBAC, audit logs, API access
+---
 
-## Tech Stack
+## Why Vaktram
 
-| Layer         | Technology                                      |
-| ------------- | ----------------------------------------------- |
-| Frontend      | Next.js 14, TypeScript, shadcn/ui, Tailwind CSS |
-| Backend       | FastAPI, SQLAlchemy 2.0, Pydantic v2            |
-| Database      | Supabase PostgreSQL + pgvector                  |
-| Auth          | Supabase Auth (OAuth, magic link)               |
-| LLM Router    | LiteLLM (100+ providers)                        |
-| Transcription | Faster-Whisper + pyannote.audio                 |
-| Bot           | Playwright + PulseAudio + FFmpeg                |
-| Cache/Queue   | Upstash Redis + QStash                          |
-| Monorepo      | Turborepo                                       |
+Every other meeting notetaker ships with a bundled LLM — you live with the vendor's choice, paying their margin, on their region. Vaktram is the opposite: **the platform stays platform-managed, the model stays yours**. Bring an API key for any LiteLLM-compatible provider; we route around it.
 
-## Quick Start
+**At a glance**
 
-### Prerequisites
+- 🧠 **Bring your own model** — OpenAI, Anthropic, Gemini, Mistral, Cohere, Azure, Vertex, Groq, Bedrock, Ollama
+- 🤖 **Self-hosted bot** — Playwright captures Meet/Zoom/Teams/Zoho on your VPS; audio never touches a third-party recorder
+- 🔍 **Hybrid search** — Postgres FTS + pgvector cosine, RRF-fused
+- 🔐 **Hardened** — JWT-rotation, HttpOnly refresh cookies, X-Bot-Auth on every internal call, QStash signature verification, CSP + HSTS preload
+- 🌏 **Region-pinned** — Singapore today, EU + US ready
+- 🧾 **GDPR retention** scheduled daily
 
-- Node.js >= 18
-- Python >= 3.11
-- Docker & Docker Compose
-- A Supabase project (free tier)
-- An Upstash account (free tier)
+---
 
-### Setup
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/your-org/vaktram.git
-cd vaktram
-
-# 2. Copy environment file and fill in your values
-cp .env.example .env
-
-# 3. Install frontend dependencies
-npm install
-
-# 4. Run with Docker Compose (all services)
-docker-compose up
-
-# OR run individual services for development:
-
-# Frontend (http://localhost:3000)
-cd apps/web && npm run dev
-
-# Backend (http://localhost:8000)
-cd apps/api && uvicorn app.main:app --reload --port 8000
-
-# 5. Open http://localhost:3000
-```
-
-### Project Structure
+## Repo layout
 
 ```
 vaktram/
 ├── apps/
-│   ├── web/              # Next.js frontend
-│   ├── api/              # FastAPI backend
-│   ├── bot-service/      # Meeting bot (Playwright)
+│   ├── api/                 # FastAPI backend (Render)
+│   │   ├── app/
+│   │   │   ├── routers/     # 25 routers, ~135 endpoints
+│   │   │   ├── services/    # Business logic (auth, billing, queue, BYOM, …)
+│   │   │   ├── models/      # SQLAlchemy 2.0 async models
+│   │   │   ├── schemas/     # Pydantic request/response shapes
+│   │   │   ├── utils/       # security, qstash_signature, internal_auth
+│   │   │   └── middleware/  # cors, rate_limit, request_context
+│   │   └── requirements.txt
+│   ├── web/                 # Next.js 14 dashboard + marketing (Vercel)
+│   │   └── src/app/
+│   │       ├── (marketing)/ # Public pages (/, /pricing, /security, …)
+│   │       ├── (auth)/      # /login, /signup, /verify-email, …
+│   │       └── (dashboard)/ # /dashboard, /meetings, /settings, …
+│   ├── bot-service/         # Playwright bot (VPS Docker)
+│   │   └── bot/
+│   │       └── platforms/   # google_meet, zoom, teams, zoho
 │   └── workers/
-│       ├── transcription/ # Whisper + pyannote
-│       └── summarizer/    # LLM summarization
-├── packages/
-│   ├── shared/           # Shared utilities
-│   ├── db/               # Database schemas
-│   └── config/           # Shared config
-├── infra/                # Docker, scripts
-└── docs/                 # Documentation
+│       ├── transcription/   # Groq Whisper (or faster-whisper)
+│       ├── summarizer/      # User's BYOM LLM
+│       └── diarization/     # pyannote 3.1 (FastAPI sidecar)
+├── docs/
+│   ├── ARCHITECTURE.md      # service map, data model, security controls
+│   ├── API.md               # every endpoint, every error
+│   └── DEPLOYMENT.md        # Render + Vercel + VPS, env vars, secrets
+├── infra/
+│   ├── docker/              # Dockerfile.api, Dockerfile.bot
+│   └── scripts/
+│       └── deploy-bot-vps.sh
+└── supabase/
+    └── migrations/          # Idempotent .sql files
 ```
-
-## SaaS Tiers
-
-| Feature        | Free         | Pro       | Team      | Enterprise |
-| -------------- | ------------ | --------- | --------- | ---------- |
-| Meetings/month | 5            | Unlimited | Unlimited | Unlimited  |
-| LLM            | Gemini Flash | BYOM      | BYOM      | BYOM       |
-| Users          | 1            | 1         | 10        | Unlimited  |
-| SSO/SAML       | -            | -         | -         | Yes        |
-| API Access     | -            | -         | -         | Yes        |
-| Audit Logs     | -            | -         | -         | Yes        |
-
-## License
-
-Proprietary. All rights reserved.
 
 ---
 
-  <!-- Running the Frontend (Next.js)
-cd apps/web                                               
-  npm install        # first time only
-  npm run dev
+## Quick start (local dev)
 
-  Runs on http://localhost:3000
+```bash
+# 1. Clone + install
+git clone https://github.com/Satyaamm/vaktram.git
+cd vaktram
 
-  Make sure apps/web/.env.local has your Supabase credentials (it already does).
+# 2. Bootstrap env
+cp .env.example .env
+# generate secrets and paste into .env (see docs/DEPLOYMENT.md §1)
 
-  ---
-  Running the Backend (FastAPI)
+# 3. Apply DB migrations (assumes Supabase project + DATABASE_URL)
+psql "$DATABASE_URL" -f supabase/migrations/00000000000001_init.sql
+# repeat for 0002, 0003, 0004 — all idempotent
 
-  cd apps/api
-  python -m venv venv          # first time only
-  source venv/bin/activate     # on macOS/Linux
-  pip install -r requirements.txt  # first time only
+# 4. Run the API (terminal 1)
+cd apps/api
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 
-  uvicorn app.main:app --reload --port 8000
+# 5. Run the dashboard (terminal 2)
+cd apps/web
+npm install
+npm run dev   # http://localhost:3000
 
-  Runs on http://localhost:8000
+# 6. (optional) Run the bot locally — needs Playwright + PulseAudio
+cd apps/bot-service
+pip install -r requirements.txt
+python -m bot.main  # http://localhost:8001
+```
 
-  You'll need a .env file in apps/api/ with:
-  DATABASE_URL=postgresql+asyncpg://postgres:password@db.<project>.supabase.co:5432/postgres
-  JWT_SECRET=<random-string-32-chars-or-longer>
-  ENCRYPTION_KEY=<32-byte-fernet-key>
+The dev pipeline falls back to inline async tasks when QStash isn't configured — fine for solo dev. **Production refuses to boot without QStash signing keys**.
 
-  Get the JWT secret from: Supabase Dashboard → Settings → API → JWT Secret
+---
 
-  ---
-  Both at once (Turborepo)
+## Production deploy
 
-  From the repo root:
-  npm install       # installs all workspace deps
-  npx turbo dev     # runs dev for all packages
+The complete operator's guide is at [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). Short version:
 
-  This starts the frontend on :3000. The backend still needs to be started separately with uvicorn since it's Python.
- -->
+| Surface | Where | Trigger |
+|---|---|---|
+| API | Render (Docker) | push to `main` |
+| Dashboard + marketing | Vercel | push to `main` |
+| Bot | VPS at `212.38.94.234` | `bash infra/scripts/deploy-bot-vps.sh` |
+| DB | Supabase (Singapore) | `psql -f migrations/*.sql` |
+| Workers (optional) | Render BG / Docker / Fly | per-target |
+
+---
+
+## How it works (60 seconds)
+
+```
+   Calendar invite
+        │
+   APScheduler ── dispatches ──► Bot service (VPS, Playwright)
+                                       │
+                            joins Meet/Zoom/Teams/Zoho
+                                       │
+                            captures audio → Supabase Storage
+                                       │
+                                  POST /audio-ready (X-Bot-Auth)
+                                       │
+                            QStash ── /pipeline/transcribe ──► Groq Whisper + pyannote
+                                                                       │
+                                                            TranscriptSegment[]
+                                                                       │
+                                                  QStash ── /pipeline/summarize ──► User's LLM (BYOM)
+                                                                                                │
+                                                                                  MeetingSummary + embeddings
+                                                                                                │
+                                                                                ───► WebSocket push to dashboard
+```
+
+Full lifecycle with file:line citations is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+---
+
+## API at a glance
+
+~135 endpoints across 25 routers. Auth tiers:
+
+- `JWT (user)` — most dashboard-facing endpoints
+- `X-Bot-Auth` — internal callers (bot, workers) → API
+- `Upstash-Signature` — QStash → API pipeline webhooks
+- `SCIM Bearer` — IDP-driven user provisioning
+- `Stripe-Signature` — billing webhooks
+- `public` — auth flows, health checks, OAuth callbacks, soundbite shares
+- `WebSocket` — `/ws/meetings/{id}` for real-time pipeline status
+
+Complete reference: [`docs/API.md`](docs/API.md).
+
+---
+
+## Security posture
+
+15 controls from the May 2026 hardening pass, every one with a citation. The full list lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#7-security-controls-summary). Highlights:
+
+- **JWT** HS256 pinned, 15 min access + 24 h refresh with rotation
+- **Refresh tokens** in `HttpOnly + Secure + SameSite=None` cookie; **access tokens** in JS memory only
+- **Bcrypt** rounds=12 with constant-time `dummy_verify` on unknown email (no timing-based account enumeration)
+- **Bot service** behind `X-Bot-Auth` shared secret; constant-time HMAC compare
+- **QStash webhooks** verified against current + next signing keys
+- **Per-email rate limit** of 3/hour on resend-verification
+- **CSP** with `frame-ancestors 'none'`, HSTS preload, `Permissions-Policy` denying camera/mic/geolocation
+- **Daily retention purge** scheduled (GDPR Art. 5(1)(e))
+
+---
+
+## Tech stack
+
+**Backend** — FastAPI 0.115, SQLAlchemy 2.0 async, Pydantic v2, Postgres 16 (+ pgvector + FTS), Upstash Redis + QStash, Resend, Groq Whisper, pyannote 3.1, APScheduler.
+
+**Frontend** — Next.js 14 App Router, React 18, Tailwind, Zustand, TanStack Query, shadcn/ui.
+
+**Bot** — Python 3.11, Playwright/Chromium, PulseAudio, FFmpeg, Docker.
+
+**Infra** — Render (API), Vercel (web), Supabase (DB + Storage), VPS (bot), Docker (workers, optional).
+
+---
+
+## Honest gaps
+
+- **No SOC 2 yet.** Targeting Q3 2026.
+- **No CI/CD for the bot** — `deploy-bot-vps.sh` requires manual SSH password entry.
+- **Zoho join** has a CAPTCHA wall; the headless bot stalls there without a solver service.
+- **Worker concurrency** doesn't lease jobs distributedly — run one instance per kind.
+- **Stripe billing** is wired but not end-to-end production-tested.
+- **Single region** today; multi-region is roadmap.
+
+---
+
+## Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — service topology, request lifecycle, data model, auth, async pipeline, BYOM, security controls
+- [`docs/API.md`](docs/API.md) — every endpoint with auth, request, response, error contract, and side effects
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Render + Vercel + VPS + Supabase + Upstash deploy guide, env vars, secrets, verification checklist
+
+---
+
+## License
+
+Private repo. Source code is closed; documentation patterns may be reused with attribution.
+
+---
+
+## Maintainers
+
+Built and maintained by **Satyam Pathak** ([@Satyaamm](https://github.com/Satyaamm)).

@@ -1,180 +1,329 @@
-# Vaktram Deployment — Free Tier First
+# Vaktram — Deployment
 
-The whole stack runs on **$0/month + $9/year (domain)** until ~30 paying
-customers, then upgrades incrementally. No localhost-only dependencies; every
-service is hosted, reliable, and has a paid tier you slide into without
-rewriting code.
+This is the operator's guide for getting Vaktram from "fresh repo" to "running in production". Every command, env var, and surface is enumerated.
 
-## Recommended stack (all free tier ⇒ paid)
+> **Topology**: Vercel (web) ↔ Render (API) ↔ Supabase (DB + Storage) ↔ Upstash (Redis + QStash) ↔ VPS (bot) ↔ Workers (optional).
 
-| Component | Service | Free tier | Why this | Upgrade trigger |
-|---|---|---|---|---|
-| Frontend | **Vercel Hobby** | 100 GB bw, unlim builds | Next.js native | Pro $20/mo at 100k visitors |
-| API | **Fly.io** | $5 monthly allowance | Docker-native, scales-to-zero, global | $25–50/mo at ~50 active users |
-| Bot service | **Fly.io Machines** | same allowance | 1 Machine per meeting, idle = $0 | per-machine billing kicks in only during a call |
-| Diarization | **Modal** | $30 free credits/mo | Serverless GPU, cold-start ~5s | pay-per-second after credits |
-| DB | **Supabase Free** | 500 MB, 50k MAU, 1 GB storage | Postgres + pgvector + RLS in one box | Pro $25/mo (no auto-pause) |
-| Object storage | **Cloudflare R2** | **10 GB + zero egress** | Audio files, no surprise bandwidth bill | $0.015/GB/mo above 10 GB |
-| Cache + WS | **Upstash Redis Free** | 10k cmd/day, 256 MB | Pub/sub for cross-instance WS | pay-as-you-go, ~$0.20/100k cmd |
-| Job queue | **Upstash QStash Free** | 500 msgs/day | Inline fallback when over quota | $1 / 100k msgs |
-| Transcription | **Groq Whisper API** | ~10 hr/day free | 10× faster than OpenAI Whisper | swap to Modal-hosted Whisper at scale |
-| LLM (default) | **Gemini 2.0 Flash** | 15 RPM, 1M tok/min free | Default for users w/o their own key | BYOM — users plug in their own |
-| Embeddings | **OpenAI text-embed-3-small** | $0.02 / 1M tokens | Cheapest reliable embed model | — |
-| Email | **Resend Free** | 100/day, 3k/mo | Transactional email | $20/mo at 50k/mo |
-| Errors | **Sentry Free** | 5k errors/mo | — | $26/mo |
-| Tracing | **Honeycomb Free** | 20M events/mo | OTel native | — |
-| Auth | **Custom JWT** | Free | Already built | WorkOS for enterprise SSO ($125/mo flat) |
-| Domain + DNS + WAF | **Cloudflare** | Free DNS + WAF, $9/yr domain | DDoS, SSL, edge caching | — |
-| Status page | **Better Stack Free** | 1 monitor | — | $24/mo |
-| CI | **GitHub Actions** | 2,000 min/mo free | already wired | — |
+## TL;DR — order of deploys
 
-**At MVP: $0 + $9/year domain.**
-**At $1k MRR (~30 customers): $50–80/mo (mostly Supabase Pro + Sentry).**
-**At $10k MRR: $300–500/mo.**
+1. **Generate secrets** (locally, once)
+2. **Apply DB migrations** (Supabase)
+3. **Set Render env** + deploy API
+4. **Set Vercel env** + deploy web (auto on push)
+5. **Run the VPS bot deploy script**
+6. **(Optional) deploy workers** — only if you bypass QStash
 
-## Why these picks specifically
+---
 
-- **Fly.io over Render/Railway** — Render free tier spins down after 15 min idle (30–60s cold start, unacceptable for a bot dispatcher). Railway killed its free tier. Fly's $5 allowance covers a small always-on API + on-demand bot Machines.
-- **Cloudflare R2 over Supabase Storage** — R2 has **zero egress fees** which is huge for audio files that get fetched by transcribers and re-served to users. 10 GB free vs 1 GB on Supabase Storage.
-- **Modal over self-hosting GPU** — pyannote needs GPU; running 24/7 on a managed GPU costs ~$700/mo. Modal scales to zero and bills per second of execution. Free $30/mo credits cover ~3,000 hours of audio diarization.
-- **Groq Whisper over self-hosted** — Groq is free up to ~10 h/day and 10× faster. We only self-host on Modal once we exceed that.
-- **Supabase over RDS/Neon** — only managed Postgres with built-in pgvector, FTS, RLS, and S3-compatible storage. The 7-day auto-pause on free tier is fine for an MVP staging env, not for prod.
+## 1. Generate secrets
 
-## What you (the human) need to do once
+Three secrets are required in production. Generate them once locally, store in your local `.env` AND in Render + on the VPS.
 
-These are the only manual setup steps. After this, deploys are `git push`.
+```bash
+# JWT signing secret — at least 32 chars; production refuses to boot below that
+echo "JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')" >> .env
 
-| Step | Service | Time |
+# Fernet key — encrypts user LLM API keys at rest
+echo "ENCRYPTION_KEY=$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> .env
+
+# Bot/worker shared secret — same value on API + VPS + workers
+echo "BOT_SHARED_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env
+```
+
+**Rotation** — `JWT_SECRET` rotation invalidates all in-flight tokens (forces re-login). `ENCRYPTION_KEY` rotation requires re-encrypting `user_ai_configs.api_key_encrypted`. `BOT_SHARED_SECRET` rotation requires bot redeploy + Render env update simultaneously.
+
+---
+
+## 2. Database (Supabase)
+
+Project: `epdymcjwgnuoojoniqwp` in `ap-southeast-1` (Singapore). Storage bucket: `vaktram-audio`.
+
+**Apply migrations** — every file is idempotent (safe to re-run).
+
+```bash
+psql "$DATABASE_URL" \
+  -f supabase/migrations/00000000000001_init.sql \
+  -f supabase/migrations/00000000000002_add_pgvector.sql \
+  -f supabase/migrations/00000000000003_email_verification.sql \
+  -f supabase/migrations/00000000000004_zoho_platform.sql
+```
+
+If `psql` isn't on your machine, the API venv has `asyncpg`:
+
+```bash
+apps/api/.venv/bin/python -c "
+import asyncio, asyncpg, pathlib
+async def main():
+    conn = await asyncpg.connect('$DATABASE_URL', statement_cache_size=0)
+    for f in sorted(pathlib.Path('supabase/migrations').glob('*.sql')):
+        await conn.execute(f.read_text())
+        print(f'applied {f.name}')
+    await conn.close()
+asyncio.run(main())
+"
+```
+
+**Storage bucket** — create `vaktram-audio` once via the Supabase dashboard, **public=false**. The bot uses the service-role key to upload via `apps/bot-service/bot/audio/supabase_uploader.py:50`.
+
+**Extensions** — `pgvector` is added by migration 0002. `pgcrypto` for `gen_random_uuid()` is enabled by Supabase by default.
+
+---
+
+## 3. API on Render
+
+Render picks the build target automatically from `apps/api/`. The Dockerfile is `infra/docker/Dockerfile.api` (referenced in `apps/api/render.yaml` if you use Render's Blueprint).
+
+### Required env vars
+
+These are all read by `apps/api/app/config.py` (Pydantic Settings):
+
+| Var | Required in prod? | Notes |
 |---|---|---|
-| 1. Buy domain on Cloudflare | Cloudflare | 5 min |
-| 2. Create Supabase project, copy `DATABASE_URL` | supabase.com | 3 min |
-| 3. Create Cloudflare R2 bucket `vaktram-audio`, generate API token | dash.cloudflare.com → R2 | 5 min |
-| 4. Create Upstash Redis + QStash projects | console.upstash.com | 3 min |
-| 5. Get Groq API key (free) | console.groq.com | 1 min |
-| 6. Get Google AI Studio key for Gemini | aistudio.google.com | 1 min |
-| 7. Get HuggingFace token (for pyannote on Modal) | huggingface.co/settings/tokens | 1 min |
-| 8. Create Resend account, verify domain | resend.com | 5 min |
-| 9. Create Sentry project (Python + Next.js) | sentry.io | 3 min |
-| 10. Create Stripe account (test mode is fine for now) | dashboard.stripe.com | 5 min |
-| 11. Install Fly CLI, run `fly launch` for api + bot | fly.io | 10 min |
-| 12. Connect Vercel to GitHub, set root to `apps/web` | vercel.com | 5 min |
-| 13. Create Modal account, deploy diarization fn | modal.com | 10 min |
+| `DATABASE_URL` | ✅ | `postgresql+asyncpg://…` (auto-rewritten if you paste plain `postgresql://`) |
+| `JWT_SECRET` | ✅ — boot fails if `<32` chars | aliased as `SUPABASE_JWT_SECRET` |
+| `ENCRYPTION_KEY` | ✅ — boot fails if invalid Fernet | validated in `lifespan` |
+| `BOT_SHARED_SECRET` | ✅ if bot is in use | same value as VPS + workers |
+| `SUPABASE_URL` | ✅ | bot/workers also need it; API uses for storage URLs |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | service role; bypasses RLS for audio bucket |
+| `GROQ_API_KEY` | ✅ | Whisper transcription |
+| `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | ✅ | verification + invite email |
+| `UPSTASH_REDIS_URL` + `UPSTASH_REDIS_TOKEN` | ✅ | rate-limit + refresh-jti revocation |
+| `QSTASH_TOKEN` | ✅ | publish pipeline jobs |
+| `QSTASH_CURRENT_SIGNING_KEY` + `QSTASH_NEXT_SIGNING_KEY` | ✅ | webhook signature verify; both supported for rotation |
+| `BOT_SERVICE_URL` | ✅ | e.g. `http://212.38.94.234:8001` |
+| `DIARIZATION_SERVICE_URL` | optional | omit and the pipeline skips diarization |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | only if calendar sync is enabled |
+| `STRIPE_API_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_*` | optional | billing flows |
+| `WORKOS_API_KEY` + `WORKOS_CLIENT_ID` | optional | enterprise SSO |
+| `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `OTEL_EXPORTER_ENDPOINT` | optional | observability |
+| `CORS_ORIGINS` | optional | comma-separated allowlist; defaults to localhost |
+| `CORS_ORIGIN_REGEX` | optional | defaults to `*.vercel.app`. **Refuses to boot if set to `.*` while `allow_credentials=true`** (`middleware/cors.py:35`) |
+| `RATE_LIMIT_PER_MINUTE` | optional, default `60` | per-user |
+| `ENVIRONMENT` | always | set to `production` to enable strict boot guards |
+| `API_BASE_URL` | always | self URL for OAuth callbacks |
+| `FRONTEND_BASE_URL` | always | dashboard URL — verification email links go here |
+| `REGION` + `STORAGE_BUCKET` | optional | defaults `us-east-1` + `vaktram-audio` |
+| `DEFAULT_RETENTION_DAYS` | optional | default `365`, overridable per-org |
 
-**Total ~1 hour. After this, every deploy is `git push origin main`.**
+### Build + run
 
-## Step-by-step: deploy from scratch
+The default Render service type is **Docker** with a build trigger from GitHub:
 
-### A. Database (Supabase)
+- **Build command** (Render uses Dockerfile, no override needed)
+- **Start command** — set in Dockerfile: `uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2`
+- **Health check path** — `/health` (200 OK = healthy; 30 s interval, 5 s timeout)
 
-```bash
-# Create project at supabase.com → copy connection string
-# Run migrations:
-psql $DATABASE_URL -f supabase/migrations/20260302155003_initial_schema.sql
-psql $DATABASE_URL -f supabase/migrations/20260307120000_add_billing.sql
-psql $DATABASE_URL -f supabase/migrations/20260307130000_add_search_indexes.sql
-psql $DATABASE_URL -f supabase/migrations/20260307140000_add_dlq.sql
-psql $DATABASE_URL -f supabase/migrations/20260307150000_add_identity.sql
-psql $DATABASE_URL -f supabase/migrations/20260307160000_add_compliance.sql
-psql $DATABASE_URL -f supabase/migrations/20260307170000_add_region.sql
-psql $DATABASE_URL -f supabase/migrations/20260307180000_add_intel_features.sql
-```
+### Startup behaviour
 
-(Or use the Supabase CLI: `supabase db push`.)
+`apps/api/app/main.py:21` runs the lifespan context, which:
 
-### B. Object storage (Cloudflare R2)
+1. Validates `ENCRYPTION_KEY` (creates a `Fernet(key)` — fails fast if malformed)
+2. Starts APScheduler + registers recurring jobs (`apps/api/app/services/meeting_scheduler.py:71-133`):
+   - `scan_upcoming_meetings` every 60 s — dispatches bots
+   - `sync_all_calendars` every 5 min
+   - `cleanup_old_jobs` every 24 h
+   - `retry_pending_webhooks` every 1 min
+   - `selector_health_check` every 7 days
+   - `run_retention_purge` every 24 h — GDPR retention enforcement
 
-```
-1. cloudflare.com → R2 → Create bucket "vaktram-audio"
-2. Manage R2 API tokens → Create token (read+write to vaktram-audio)
-3. Save: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
-4. Optional: enable public bucket for read-only signed URLs
-```
+### Redeploy
 
-### C. API + Bot service (Fly.io)
+Push to `main` → GitHub webhook → Render rebuilds + deploys. Verify with `curl https://vaktram-api.onrender.com/health`.
 
-```bash
-# Install: brew install flyctl
-fly auth signup
-fly launch --config infra/fly/fly.api.toml --no-deploy
-fly secrets set \
-  DATABASE_URL=...        \
-  JWT_SECRET=...          \
-  ENCRYPTION_KEY=...      \
-  GROQ_API_KEY=...        \
-  GOOGLE_AI_API_KEY=...   \
-  UPSTASH_REDIS_URL=...   \
-  UPSTASH_REDIS_TOKEN=... \
-  QSTASH_TOKEN=...        \
-  STRIPE_API_KEY=...      \
-  R2_ACCOUNT_ID=...       \
-  R2_ACCESS_KEY_ID=...    \
-  R2_SECRET_ACCESS_KEY=...\
-  STORAGE_BUCKET=vaktram-audio \
-  -a vaktram-api
-fly deploy -c infra/fly/fly.api.toml
+---
 
-# Repeat for bot:
-fly launch --config infra/fly/fly.bot.toml --no-deploy
-fly deploy -c infra/fly/fly.bot.toml
-```
+## 4. Web (Vercel)
 
-### D. Frontend (Vercel)
+Single Vercel project at the root directory `apps/web`. Hosts marketing routes (`/`, `/pricing`, …), auth (`/login`, `/signup`, …), and dashboard (`/dashboard`, `/meetings`, …) on the same origin.
 
-```
-1. vercel.com → Import GitHub repo
-2. Root directory: apps/web
-3. Framework: Next.js (auto-detected)
-4. Env vars: NEXT_PUBLIC_API_URL=https://api.vaktram.com
-5. Deploy
-6. Add custom domain in Cloudflare DNS:
-   www → CNAME → cname.vercel-dns.com
-   api → CNAME → vaktram-api.fly.dev
-```
+### Env vars
 
-### E. Diarization (Modal)
+| Var | Value |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | `https://vaktram-api.onrender.com` (or local) |
+| `NEXT_PUBLIC_APP_URL` | `https://vaktram-web.vercel.app` (the dashboard's own URL) |
+| `NEXT_PUBLIC_WEBSITE_URL` | same as APP_URL while marketing + dashboard share a deploy |
+| `NEXT_PUBLIC_CONTACT_ENDPOINT` | optional — POST target for the contact form. Falls back to `mailto:hello@vaktram.com` |
+| `NEXT_PUBLIC_SITE_URL` | optional — used in OG metadata, defaults to `VERCEL_URL` |
+
+Set scope to **Production, Preview, Development** unless preview deploys should target a staging API.
+
+### Security headers
+
+Configured in `apps/web/next.config.mjs:29-58`:
+
+- `Content-Security-Policy` with `frame-ancestors 'none'`, `object-src 'none'`, no third-party script hosts
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: geolocation=(), microphone=(), camera=(), interest-cohort=()`
+
+### Build + deploy
+
+Auto on push. The Vercel CLI works too:
 
 ```bash
-pip install modal
-modal token new
-modal deploy infra/modal/diarize.py
-# Note the URL it prints, set as DIARIZATION_SERVICE_URL on Fly
+cd apps/web
+npx vercel deploy --prod
 ```
 
-### F. Verify happy path
+### Verify
+
+- `https://vaktram-web.vercel.app/` → marketing home
+- Sign in/Start free CTAs → `/login`, `/signup`
+- After login → `/dashboard`
+- Sign-out clears cookies + revokes refresh
+
+---
+
+## 5. Bot service (VPS)
+
+Target: VPS at `212.38.94.234`. Deploy via the one-shot script.
+
+### Required local env (in your repo's `.env`)
 
 ```bash
-# 1. Sign up via the web app
-# 2. Connect Google Calendar
-# 3. Schedule a Google Meet for 2 minutes from now
-# 4. Watch logs:  fly logs -a vaktram-api -a vaktram-bot
-# 5. After meeting ends, transcript + summary appear in dashboard
+NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co     # forwarded as SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_…
+BOT_SHARED_SECRET=<same value as on Render API>
 ```
 
-## When to upgrade what
+### Deploy
 
-| Signal | Upgrade | Cost |
+```bash
+bash infra/scripts/deploy-bot-vps.sh
+```
+
+What it does (`infra/scripts/deploy-bot-vps.sh`):
+
+1. SSH to `root@212.38.94.234` (prompts for password)
+2. Installs Docker if missing
+3. Clones (or hard-resets) the repo at `/opt/vaktram`
+4. Writes `apps/bot-service/.env` (root-owned, 0600) with: `API_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BOT_SHARED_SECRET`, `STORAGE_BUCKET=vaktram-audio`, `HEADLESS=true`, `BOT_MAX_DURATION_SEC=10800`, `BOT_END_CHECK_INTERVAL_SEC=10`, `REGION=ap-southeast-1`, `BOT_SERVICE_PORT=8001`
+5. Stops + removes the existing `vaktram-bot` container
+6. Removes the previous `vaktram-bot:latest` image
+7. Prunes dangling Docker layers
+8. Builds `--no-cache --pull` (3-5 min)
+9. Runs the new container (`--restart unless-stopped`, port 8001)
+10. Polls `http://localhost:8001/health` for up to 45 s; on success, prints status; on failure, dumps the last 50 log lines
+
+### Verify externally
+
+```bash
+curl http://212.38.94.234:8001/health
+# Expected: {"status":"healthy","active_bots":0,"version":"0.1.0"}
+```
+
+If you get connection-refused, open the firewall:
+
+```bash
+ssh root@212.38.94.234 'ufw allow 8001/tcp'
+```
+
+### After bot is up
+
+- Render API → confirm `BOT_SERVICE_URL=http://212.38.94.234:8001` and `BOT_SHARED_SECRET=<value>` are set, redeploy if changed.
+- Schedule a Google Meet to validate end-to-end.
+
+---
+
+## 6. Workers (optional)
+
+Workers are an alternative to the inline + QStash pipeline. With QStash configured, you don't need standalone workers — the API runs each pipeline stage on QStash-delivered webhooks. Workers exist for:
+
+- **Higher throughput**: parallelise transcription across multiple machines
+- **GPU-bound diarization**: pyannote runs faster on a CUDA host
+- **Self-hosted Whisper**: replace Groq with local `faster-whisper`
+
+### Transcription worker (`apps/workers/transcription/worker.py`)
+
+- Polls `meetings` table for `status='transcribing'` every `POLL_INTERVAL_SECONDS` (default 5)
+- Env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `API_URL`, `BOT_SHARED_SECRET`, `AUDIO_STORAGE_BUCKET`, `WHISPER_MODEL` (default `large-v3`), `COMPUTE_DEVICE`
+- Posts back to `POST /internal/meetings/{id}/transcription-complete` with `X-Bot-Auth`
+
+### Summarizer worker (`apps/workers/summarizer/worker.py`)
+
+- Polls for `status='summarizing'` every 10 s
+- Env: same as transcription + `ENCRYPTION_KEY` (decrypt user keys), `DEFAULT_LLM_PROVIDER`, `DEFAULT_LLM_MODEL`, `DEFAULT_LLM_API_KEY`
+
+### Diarization service (`apps/workers/diarization/main.py`)
+
+- FastAPI on port 8002 with `POST /diarize`
+- Env: `HF_TOKEN`, `DIARIZATION_MODEL` (default `pyannote/speaker-diarization-3.1`)
+- Heavy: requires GPU or 16 GB RAM
+
+> ⚠️ **Concurrency caveat**: workers don't lease jobs distributedly. Running >1 instance per kind risks duplicate processing.
+
+---
+
+## 7. Upstash (Redis + QStash)
+
+Both services share an Upstash account.
+
+### Redis
+
+Used for: rate limiting, refresh-token jti revocation list (`session_service`), per-email rate limit on resend-verification.
+
+- `UPSTASH_REDIS_URL` = `https://<id>.upstash.io`
+- `UPSTASH_REDIS_TOKEN` = REST token
+
+If absent, rate-limit middleware silently noop's (`apps/api/app/main.py:57-60`) — fine for local dev, **never deploy prod without it**.
+
+### QStash
+
+Used for: pipeline jobs (`/internal/pipeline/transcribe/{id}` and `/internal/pipeline/summarize/{id}`).
+
+- `QSTASH_TOKEN` — publish jobs
+- `QSTASH_CURRENT_SIGNING_KEY` + `QSTASH_NEXT_SIGNING_KEY` — verify webhook signatures
+
+When QStash signing keys are missing in `production`, **the API refuses to boot** (`apps/api/app/utils/qstash_signature.py:84`).
+
+---
+
+## 8. Email (Resend) + Transcription (Groq)
+
+| Service | Env | Free tier |
 |---|---|---|
-| Supabase project pauses on you | Supabase Pro | $25/mo |
-| Fly.io bill creeps past $5 | Buy a $25 reservation | $25/mo |
-| Groq 10 h/day exhausted regularly | Self-host Whisper on Modal | $0.03/audio-hour |
-| 50k Resend emails/mo | Resend Pro | $20/mo |
-| Sentry 5k errors/mo blown | Team plan | $26/mo |
-| First enterprise lead asking for SAML | WorkOS | $125/mo flat |
-| Multi-region (EU customer) | Add Fly EU region + EU bucket | $0 marginal |
+| Resend | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | 100 emails/day |
+| Groq | `GROQ_API_KEY` | 10 hr/day Whisper |
 
-## Upgrade math (back-of-envelope)
+Resend `from` defaults to `no-reply@vaktram.com` (`apps/api/app/config.py:126`).
 
-```
-Customers   Plan-mix       MRR        Hosting cost   Margin
-   30      mostly Pro      $360       $50            86%
-  300      Pro+Team        $5k        $300           94%
-3000       +Business+SSO   $80k       $3k            96%
-```
+---
 
-## What we deliberately did NOT pick
+## 9. Verification checklist
 
-- **AWS / GCP / Azure** for hosting — too much setup time for an MVP. Move there for Enterprise on-prem only.
-- **Heroku** — no free tier since 2022.
-- **DigitalOcean App Platform** — fine, but Fly's per-meeting Machines map better to our bot model.
-- **Pinecone** — pgvector inside Supabase is enough until ~10M vectors.
-- **Twilio** — overkill; Resend covers email, no SMS needed yet.
+After every fresh deploy:
+
+- [ ] `curl https://vaktram-api.onrender.com/health` → `{"status":"ok"}`
+- [ ] `curl https://vaktram-api.onrender.com/healthz` → `{"status":"ok","database":"connected"}`
+- [ ] `curl http://212.38.94.234:8001/health` → bot healthy
+- [ ] Browse to `https://vaktram-web.vercel.app/` → marketing renders
+- [ ] Sign up → verification email received → click link → land on `/settings/ai-config?from=verify`
+- [ ] Add a BYOM key → save → AI config status flips to `configured: true`
+- [ ] Schedule a Google Meet → bot dispatches → audio captured → transcript + summary land
+
+If any step fails, the relevant sub-system is the suspect: `/health` for the API, `/healthz` for the DB, `:8001/health` for the bot, the dashboard for the frontend.
+
+---
+
+## 10. Roll-back
+
+- **API/web**: redeploy a prior commit on Render/Vercel via their UI
+- **DB migrations**: forward-only by design; the migrations are idempotent but not reversible. Restore from Supabase's automatic daily backup if you need to undo.
+- **Bot**: re-run `infra/scripts/deploy-bot-vps.sh` after `git checkout` of a prior tag
+
+---
+
+## 11. Common errors
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| API 500 on startup with `ENCRYPTION_KEY` error | Key not set or malformed Fernet | Generate via `Fernet.generate_key()` |
+| API boots but `/login` returns 401 even with right credentials | `JWT_SECRET` differs across replicas / restarts | Ensure same value across all instances |
+| Bot returns 401 on every dispatch | `BOT_SHARED_SECRET` mismatch | Set same value on Render API + VPS `.env`, redeploy both |
+| QStash webhooks return 401 | Signing keys missing or wrong | Set `QSTASH_CURRENT_SIGNING_KEY` + `_NEXT_SIGNING_KEY` |
+| `verify-email` link 404s | `FRONTEND_BASE_URL` points at the wrong host | Set on Render to your real Vercel URL |
+| Build fails on Vercel with `unused-vars` | A removed import wasn't cleaned up | Run `npm run build` locally before pushing |
+| `Failed to compile.` on bot deploy script | Stale `.next` from a previous run | Script runs `--no-cache`; if Docker disk is full, `docker system prune -af` on the VPS |
