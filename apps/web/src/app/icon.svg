@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Placeholder favicon — minimal slate-950 rounded square with a white "V"
+    rendered as a path so it survives across font stacks. Replace this file
+    by dropping the real `icon.png` (and `apple-icon.png`) at the same
+    folder, then deleting this svg so Next.js picks up the PNG cleanly.
+  -->
+  <rect width="32" height="32" rx="6" fill="#020617"/>
+  <path
+    d="M9.6 9.5h3.0l3.4 8.6 3.4-8.6h3.0l-5.0 13h-2.8z"
+    fill="#ffffff"
+  />
+</svg>

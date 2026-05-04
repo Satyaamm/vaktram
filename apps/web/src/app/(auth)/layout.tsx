@@ -96,8 +96,12 @@ export default function AuthLayout({
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
-          <div className="w-full max-w-md">{children}</div>
+        {/* Content scrolls naturally with the page; my-auto centers the
+            form vertically only when the viewport is taller than the
+            content. Avoids the inner-scrollbar artifact users saw on
+            shorter screens with the long signup form. */}
+        <div className="relative z-10 flex flex-1 justify-center px-4 py-10 sm:px-8">
+          <div className="my-auto w-full max-w-md">{children}</div>
         </div>
 
         <p className="relative z-10 pb-6 text-center text-xs text-slate-400 lg:hidden">

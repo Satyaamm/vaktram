@@ -211,18 +211,8 @@ export default function SignupPage() {
         </p>
       </header>
 
-      {/* BYOM heads-up — unmissable, sets expectations before signup */}
-      <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
-        <div className="flex gap-2">
-          <Key className="mt-0.5 h-4 w-4 flex-none" />
-          <p className="leading-relaxed">
-            <span className="font-semibold">Bring your own model.</span>{" "}
-            After verifying your email you&apos;ll connect an LLM API key
-            (Gemini, OpenAI, Claude, Mistral…). You stay in control of cost,
-            data, and provider.
-          </p>
-        </div>
-      </div>
+      {/* BYOM is communicated post-verify on /settings/ai-config; the
+          signup form itself stays focused on getting you in. */}
 
       {errors._form && (
         <div
