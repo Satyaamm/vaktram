@@ -55,11 +55,23 @@ async def lifespan(app: FastAPI):
     await orchestrator.shutdown()
 
 
+# Disable Swagger UI and the OpenAPI schema in production. Without this,
+# anyone hitting http://<vps>:1003/docs gets a fully-introspected API
+# surface (route names, parameter shapes, the require_bot_auth header
+# itself documented). The auth gate still rejects unauthenticated calls
+# but there's no reason to advertise the endpoint catalogue. ENV=development
+# (the default for local dev) keeps the docs available.
+_BOT_ENV = os.getenv("ENV", os.getenv("ENVIRONMENT", "production")).lower()
+_DOCS_ENABLED = _BOT_ENV in ("development", "dev", "local")
+
 app = FastAPI(
     title="Vaktram Bot Service",
     description="Manages meeting bots that join calls, capture audio, and stream for transcription.",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
 )
 
 

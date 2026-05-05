@@ -77,33 +77,33 @@ Render picks the build target automatically from `apps/api/`. The Dockerfile is 
 
 These are all read by `apps/api/app/config.py` (Pydantic Settings):
 
-| Var | Required in prod? | Notes |
-|---|---|---|
-| `DATABASE_URL` | ✅ | `postgresql+asyncpg://…` (auto-rewritten if you paste plain `postgresql://`) |
-| `JWT_SECRET` | ✅ — boot fails if `<32` chars | aliased as `SUPABASE_JWT_SECRET` |
-| `ENCRYPTION_KEY` | ✅ — boot fails if invalid Fernet | validated in `lifespan` |
-| `BOT_SHARED_SECRET` | ✅ if bot is in use | same value as VPS + workers |
-| `SUPABASE_URL` | ✅ | bot/workers also need it; API uses for storage URLs |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | service role; bypasses RLS for audio bucket |
-| `GROQ_API_KEY` | ✅ | Whisper transcription |
-| `RESEND_API_KEY` + `RESEND_FROM_EMAIL` | ✅ | verification + invite email |
-| `UPSTASH_REDIS_URL` + `UPSTASH_REDIS_TOKEN` | ✅ | rate-limit + refresh-jti revocation |
-| `QSTASH_TOKEN` | ✅ | publish pipeline jobs |
-| `QSTASH_CURRENT_SIGNING_KEY` + `QSTASH_NEXT_SIGNING_KEY` | ✅ | webhook signature verify; both supported for rotation |
-| `BOT_SERVICE_URL` | ✅ | e.g. `http://212.38.94.234:1003` |
-| `DIARIZATION_SERVICE_URL` | optional | omit and the pipeline skips diarization |
-| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | only if calendar sync is enabled |
-| `STRIPE_API_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_*` | optional | billing flows |
-| `WORKOS_API_KEY` + `WORKOS_CLIENT_ID` | optional | enterprise SSO |
-| `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `OTEL_EXPORTER_ENDPOINT` | optional | observability |
-| `CORS_ORIGINS` | optional | comma-separated allowlist; defaults to localhost |
-| `CORS_ORIGIN_REGEX` | optional | defaults to `*.vercel.app`. **Refuses to boot if set to `.*` while `allow_credentials=true`** (`middleware/cors.py:35`) |
-| `RATE_LIMIT_PER_MINUTE` | optional, default `60` | per-user |
-| `ENVIRONMENT` | always | set to `production` to enable strict boot guards |
-| `API_BASE_URL` | always | self URL for OAuth callbacks |
-| `FRONTEND_BASE_URL` | always | dashboard URL — verification email links go here |
-| `REGION` + `STORAGE_BUCKET` | optional | defaults `us-east-1` + `vaktram-audio` |
-| `DEFAULT_RETENTION_DAYS` | optional | default `365`, overridable per-org |
+| Var                                                                 | Required in prod?                 | Notes                                                                                                                   |
+| ------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                      | ✅                                | `postgresql+asyncpg://…` (auto-rewritten if you paste plain `postgresql://`)                                            |
+| `JWT_SECRET`                                                        | ✅ — boot fails if `<32` chars    | aliased as `SUPABASE_JWT_SECRET`                                                                                        |
+| `ENCRYPTION_KEY`                                                    | ✅ — boot fails if invalid Fernet | validated in `lifespan`                                                                                                 |
+| `BOT_SHARED_SECRET`                                                 | ✅ if bot is in use               | same value as VPS + workers                                                                                             |
+| `SUPABASE_URL`                                                      | ✅                                | bot/workers also need it; API uses for storage URLs                                                                     |
+| `SUPABASE_SERVICE_ROLE_KEY`                                         | ✅                                | service role; bypasses RLS for audio bucket                                                                             |
+| `GROQ_API_KEY`                                                      | ✅                                | Whisper transcription                                                                                                   |
+| `RESEND_API_KEY` + `RESEND_FROM_EMAIL`                              | ✅                                | verification + invite email                                                                                             |
+| `UPSTASH_REDIS_URL` + `UPSTASH_REDIS_TOKEN`                         | ✅                                | rate-limit + refresh-jti revocation                                                                                     |
+| `QSTASH_TOKEN`                                                      | ✅                                | publish pipeline jobs                                                                                                   |
+| `QSTASH_CURRENT_SIGNING_KEY` + `QSTASH_NEXT_SIGNING_KEY`            | ✅                                | webhook signature verify; both supported for rotation                                                                   |
+| `BOT_SERVICE_URL`                                                   | ✅                                | e.g. `http://212.38.94.234:1003`                                                                                        |
+| `DIARIZATION_SERVICE_URL`                                           | optional                          | omit and the pipeline skips diarization                                                                                 |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`                         | optional                          | only if calendar sync is enabled                                                                                        |
+| `STRIPE_API_KEY` + `STRIPE_WEBHOOK_SECRET` + `STRIPE_PRICE_*`       | optional                          | billing flows                                                                                                           |
+| `WORKOS_API_KEY` + `WORKOS_CLIENT_ID`                               | optional                          | enterprise SSO                                                                                                          |
+| `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`, `OTEL_EXPORTER_ENDPOINT` | optional                          | observability                                                                                                           |
+| `CORS_ORIGINS`                                                      | optional                          | comma-separated allowlist; defaults to localhost                                                                        |
+| `CORS_ORIGIN_REGEX`                                                 | optional                          | defaults to `*.vercel.app`. **Refuses to boot if set to `.*` while `allow_credentials=true`** (`middleware/cors.py:35`) |
+| `RATE_LIMIT_PER_MINUTE`                                             | optional, default `60`            | per-user                                                                                                                |
+| `ENVIRONMENT`                                                       | always                            | set to `production` to enable strict boot guards                                                                        |
+| `API_BASE_URL`                                                      | always                            | self URL for OAuth callbacks                                                                                            |
+| `FRONTEND_BASE_URL`                                                 | always                            | dashboard URL — verification email links go here                                                                        |
+| `REGION` + `STORAGE_BUCKET`                                         | optional                          | defaults `us-east-1` + `vaktram-audio`                                                                                  |
+| `DEFAULT_RETENTION_DAYS`                                            | optional                          | default `365`, overridable per-org                                                                                      |
 
 ### Build + run
 
@@ -138,13 +138,13 @@ Single Vercel project at the root directory `apps/web`. Hosts marketing routes (
 
 ### Env vars
 
-| Var | Value |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://vaktram-api.onrender.com` (or local) |
-| `NEXT_PUBLIC_APP_URL` | `https://vaktram-web.vercel.app` (the dashboard's own URL) |
-| `NEXT_PUBLIC_WEBSITE_URL` | same as APP_URL while marketing + dashboard share a deploy |
+| Var                            | Value                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`          | `https://vaktram-api.onrender.com` (or local)                                         |
+| `NEXT_PUBLIC_APP_URL`          | `https://vaktram-web.vercel.app` (the dashboard's own URL)                            |
+| `NEXT_PUBLIC_WEBSITE_URL`      | same as APP_URL while marketing + dashboard share a deploy                            |
 | `NEXT_PUBLIC_CONTACT_ENDPOINT` | optional — POST target for the contact form. Falls back to `mailto:hello@vaktram.com` |
-| `NEXT_PUBLIC_SITE_URL` | optional — used in OG metadata, defaults to `VERCEL_URL` |
+| `NEXT_PUBLIC_SITE_URL`         | optional — used in OG metadata, defaults to `VERCEL_URL`                              |
 
 Set scope to **Production, Preview, Development** unless preview deploys should target a staging API.
 
@@ -180,6 +180,8 @@ npx vercel deploy --prod
 ## 5. Bot service (VPS)
 
 Target: VPS at `212.38.94.234`. Deploy via the one-shot script.
+
+bash infra/scripts/deploy-bot-vps.sh
 
 ### Required local env (in your repo's `.env`)
 
@@ -283,10 +285,10 @@ When QStash signing keys are missing in `production`, **the API refuses to boot*
 
 ## 8. Email (Resend) + Transcription (Groq)
 
-| Service | Env | Free tier |
-|---|---|---|
-| Resend | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | 100 emails/day |
-| Groq | `GROQ_API_KEY` | 10 hr/day Whisper |
+| Service | Env                                   | Free tier         |
+| ------- | ------------------------------------- | ----------------- |
+| Resend  | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | 100 emails/day    |
+| Groq    | `GROQ_API_KEY`                        | 10 hr/day Whisper |
 
 Resend `from` defaults to `no-reply@vaktram.com` (`apps/api/app/config.py:126`).
 
@@ -318,12 +320,12 @@ If any step fails, the relevant sub-system is the suspect: `/health` for the API
 
 ## 11. Common errors
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| API 500 on startup with `ENCRYPTION_KEY` error | Key not set or malformed Fernet | Generate via `Fernet.generate_key()` |
-| API boots but `/login` returns 401 even with right credentials | `JWT_SECRET` differs across replicas / restarts | Ensure same value across all instances |
-| Bot returns 401 on every dispatch | `BOT_SHARED_SECRET` mismatch | Set same value on Render API + VPS `.env`, redeploy both |
-| QStash webhooks return 401 | Signing keys missing or wrong | Set `QSTASH_CURRENT_SIGNING_KEY` + `_NEXT_SIGNING_KEY` |
-| `verify-email` link 404s | `FRONTEND_BASE_URL` points at the wrong host | Set on Render to your real Vercel URL |
-| Build fails on Vercel with `unused-vars` | A removed import wasn't cleaned up | Run `npm run build` locally before pushing |
-| `Failed to compile.` on bot deploy script | Stale `.next` from a previous run | Script runs `--no-cache`; if Docker disk is full, `docker system prune -af` on the VPS |
+| Symptom                                                        | Cause                                           | Fix                                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
+| API 500 on startup with `ENCRYPTION_KEY` error                 | Key not set or malformed Fernet                 | Generate via `Fernet.generate_key()`                                                   |
+| API boots but `/login` returns 401 even with right credentials | `JWT_SECRET` differs across replicas / restarts | Ensure same value across all instances                                                 |
+| Bot returns 401 on every dispatch                              | `BOT_SHARED_SECRET` mismatch                    | Set same value on Render API + VPS `.env`, redeploy both                               |
+| QStash webhooks return 401                                     | Signing keys missing or wrong                   | Set `QSTASH_CURRENT_SIGNING_KEY` + `_NEXT_SIGNING_KEY`                                 |
+| `verify-email` link 404s                                       | `FRONTEND_BASE_URL` points at the wrong host    | Set on Render to your real Vercel URL                                                  |
+| Build fails on Vercel with `unused-vars`                       | A removed import wasn't cleaned up              | Run `npm run build` locally before pushing                                             |
+| `Failed to compile.` on bot deploy script                      | Stale `.next` from a previous run               | Script runs `--no-cache`; if Docker disk is full, `docker system prune -af` on the VPS |

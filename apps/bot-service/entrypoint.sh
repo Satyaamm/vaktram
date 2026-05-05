@@ -11,8 +11,17 @@ set -euo pipefail
 PULSE_SOCKET="${PULSE_SERVER#unix:}"
 PULSE_SOCKET="${PULSE_SOCKET:-/tmp/pulseaudio.socket}"
 
-# Clean any stale socket from previous runs.
+# Wipe ALL pulseaudio state from the previous container run. Without this,
+# the FIRST run succeeds (clean slate) but every restart fails with
+# "Daemon startup failed" because pulseaudio left:
+#   • /tmp/pulseaudio.socket            ← the socket itself
+#   • /tmp/pulse-runtime/cli + pid + …   ← runtime state, locked by old PID
+#   • /root/.config/pulse/<machine-id>*  ← stamps with cookies and IDs
+# The first launch creates them fresh; the second sees them and refuses
+# to start a new instance. We delete everything so each restart is a
+# clean slate.
 rm -f "$PULSE_SOCKET"
+rm -rf /tmp/pulse-runtime /tmp/pulse-* /root/.config/pulse 2>/dev/null || true
 
 # CRITICAL: PULSE_SERVER tells *clients* where the daemon lives. The daemon
 # itself, on seeing PULSE_SERVER set, thinks "a daemon is already running
