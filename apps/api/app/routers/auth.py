@@ -296,6 +296,113 @@ async def resend_verification(
     return {"message": "If an account exists for that email and isn't verified yet, a new link is on its way."}
 
 
+# ── Password reset ──────────────────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(
+    body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)
+):
+    """Email a password-reset link to the user. Always returns 202 — never
+    reveal whether the email is registered (no enumeration). Rate-limited
+    to 3 sends per email per hour, same as resend-verification, so an
+    attacker can't pin a victim's inbox."""
+    email = (body.email or "").lower().strip()
+
+    if session_service.hit_rate_limit(
+        f"reset-password:{email}", max_hits=3, window_seconds=3600
+    ):
+        return {"message": "If an account exists for that email, a reset link is on its way."}
+
+    user = (await db.execute(
+        select(UserProfile).where(UserProfile.email == email)
+    )).scalar_one_or_none()
+
+    if user is not None and user.password_hash:
+        # Invalidate any outstanding reset tokens, then mint a fresh one
+        # with the 30-minute TTL the verification_service handles for
+        # password_reset purpose.
+        await verification_service.invalidate_existing(
+            db, user_id=user.id, purpose="password_reset"
+        )
+        token = await verification_service.issue(
+            db, user_id=user.id, purpose="password_reset"
+        )
+        reset_url = f"{_settings.frontend_base_url.rstrip('/')}/reset-password?token={token}"
+        try:
+            subject, html, text = email_templates.password_reset(reset_url=reset_url)
+            await email_service.send_email(
+                to=user.email, subject=subject, html=html, text=text
+            )
+        except Exception:
+            logger.exception("password reset email failed for %s", user.id)
+    else:
+        # Spend roughly the same wall-clock time even when the email is
+        # unknown so timing doesn't leak account existence. The token
+        # issue path costs roughly the time of one DB roundtrip; we
+        # mirror it with a no-op SELECT that travels the same path.
+        await db.execute(select(UserProfile.id).where(UserProfile.id == uuid.uuid4()))
+
+    return {"message": "If an account exists for that email, a reset link is on its way."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(
+    body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)
+):
+    """Redeem a reset token and set a new password. Token is consumed
+    on success (single-use)."""
+    new_password = body.new_password or ""
+    if len(new_password) < 8 or len(new_password) > 128:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "weak_password",
+                "message": "Password must be 8–128 characters.",
+            },
+        )
+    if not any(c.isalpha() for c in new_password) or not any(
+        c.isdigit() for c in new_password
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "weak_password",
+                "message": "Password must contain at least one letter and one number.",
+            },
+        )
+
+    user_id = await verification_service.consume(
+        db, token=body.token, purpose="password_reset"
+    )
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "invalid_or_expired_token",
+                "message": "This reset link is invalid or has expired. Request a new one.",
+            },
+        )
+
+    user = (await db.execute(
+        select(UserProfile).where(UserProfile.id == user_id)
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(404, "User not found")
+
+    user.password_hash = hash_password(new_password)
+    await db.flush()
+    # Returns 204 No Content; the client redirects to /login.
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(
     body: LoginRequest,
