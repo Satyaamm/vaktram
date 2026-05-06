@@ -72,7 +72,7 @@ const ITEMS_PER_PAGE = 10;
 const createMeetingSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   meeting_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  platform: z.enum(["zoom", "google_meet", "teams", "other"]),
+  platform: z.enum(["zoom", "google_meet", "teams", "zoho", "other"]),
   scheduled_at: z.string().optional().or(z.literal("")),
   description: z.string().optional().or(z.literal("")),
 });
@@ -451,6 +451,7 @@ export default function MeetingsPage() {
                             Google Meet
                           </SelectItem>
                           <SelectItem value="teams">Microsoft Teams</SelectItem>
+                          <SelectItem value="zoho">Zoho Meeting</SelectItem>
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
@@ -572,6 +573,7 @@ export default function MeetingsPage() {
                 <SelectItem value="google_meet">Google Meet</SelectItem>
                 <SelectItem value="zoom">Zoom</SelectItem>
                 <SelectItem value="teams">Teams</SelectItem>
+                <SelectItem value="zoho">Zoho Meeting</SelectItem>
               </SelectContent>
             </Select>
           </div>
