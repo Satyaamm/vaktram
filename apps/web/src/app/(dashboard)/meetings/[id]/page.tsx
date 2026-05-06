@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { startBot, stopBot, deleteMeeting } from "@/lib/api/meetings";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -131,6 +132,7 @@ export default function MeetingDetailPage() {
 
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const audioPlayerRef = useRef<AudioPlayerHandle>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -146,22 +148,43 @@ export default function MeetingDetailPage() {
     mutationFn: () => startBot(meetingId, meeting?.meeting_url || ""),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meeting", meetingId] });
+      toast({ title: "Bot dispatched", description: "Joining the meeting now." });
     },
+    onError: (e: unknown) =>
+      toast({
+        title: "Couldn't start the bot",
+        description: e instanceof Error ? e.message : "Check the meeting URL and try again.",
+        variant: "destructive",
+      }),
   });
 
   const stopBotMutation = useMutation({
     mutationFn: () => stopBot(meetingId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meeting", meetingId] });
+      toast({ title: "Bot left the meeting" });
     },
+    onError: (e: unknown) =>
+      toast({
+        title: "Couldn't stop the bot",
+        description: e instanceof Error ? e.message : "It may have already left.",
+        variant: "destructive",
+      }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteMeeting(meetingId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      toast({ title: "Meeting deleted" });
       router.push("/meetings");
     },
+    onError: (e: unknown) =>
+      toast({
+        title: "Delete failed",
+        description: e instanceof Error ? e.message : "Try again in a moment.",
+        variant: "destructive",
+      }),
   });
 
   const {

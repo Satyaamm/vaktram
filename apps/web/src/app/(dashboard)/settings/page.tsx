@@ -890,13 +890,23 @@ function BillingTab() {
 // ---------------------------------------------------------------------------
 
 function AuditTab() {
+  const { toast } = useToast();
   const { data: rows, isLoading } = useQuery({
     queryKey: ["audit"],
     queryFn: () => complianceApi.listAudit(200),
     retry: 1,
   });
 
-  const verify = useMutation({ mutationFn: complianceApi.verifyChain });
+  const verify = useMutation({
+    mutationFn: complianceApi.verifyChain,
+    onSuccess: () => toast({ title: "Audit chain verified" }),
+    onError: (e: unknown) =>
+      toast({
+        title: "Couldn't verify audit chain",
+        description: e instanceof Error ? e.message : "Try again later.",
+        variant: "destructive",
+      }),
+  });
 
   return (
     <Card>

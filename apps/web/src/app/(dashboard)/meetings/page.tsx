@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useMeetings } from "@/lib/hooks/use-meeting";
 import { createMeeting, uploadAudio } from "@/lib/api/meetings";
+import { useToast } from "@/hooks/use-toast";
 import type { Meeting, CreateMeetingInput } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,6 +174,7 @@ function TableLoadingSkeleton() {
 export default function MeetingsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -229,7 +231,14 @@ export default function MeetingsPage() {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
       setDialogOpen(false);
       form.reset();
+      toast({ title: "Meeting created" });
     },
+    onError: (e: unknown) =>
+      toast({
+        title: "Couldn't create meeting",
+        description: e instanceof Error ? e.message : "Try again.",
+        variant: "destructive",
+      }),
   });
 
   // Upload audio mutation
@@ -241,8 +250,15 @@ export default function MeetingsPage() {
       setUploadDialogOpen(false);
       setUploadFile(null);
       setUploadTitle("");
+      toast({ title: "Audio uploaded — transcription queued" });
       router.push(`/meetings/${meeting.id}`);
     },
+    onError: (e: unknown) =>
+      toast({
+        title: "Upload failed",
+        description: e instanceof Error ? e.message : "Try a smaller file or different format.",
+        variant: "destructive",
+      }),
   });
 
   const form = useForm<CreateMeetingFormValues>({

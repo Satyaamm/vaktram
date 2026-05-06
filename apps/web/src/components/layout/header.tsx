@@ -75,14 +75,22 @@ export function Header() {
   });
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  // Notification mark-read failures are benign — the next refetch
+  // reconciles unread state. We silently log so devs can spot drift,
+  // but don't toast: spamming the user every time a mark-read fails is
+  // worse than the (already-refreshing) UI being briefly stale.
   const markReadMutation = useMutation({
     mutationFn: markNotificationRead,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onError: (e: unknown) =>
+      console.warn("mark notification read failed:", e instanceof Error ? e.message : e),
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: markAllNotificationsRead,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onError: (e: unknown) =>
+      console.warn("mark-all notifications read failed:", e instanceof Error ? e.message : e),
   });
 
   const handleSignOut = async () => {
