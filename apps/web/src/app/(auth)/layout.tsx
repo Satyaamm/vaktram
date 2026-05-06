@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Brain, Calendar, Search } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 // Auth chrome — fully light. Split-screen on lg+ with a tinted brand
 // panel on the left and the form on the right. Dark CTAs (slate-950)
@@ -101,7 +102,9 @@ export default function AuthLayout({
             content. Avoids the inner-scrollbar artifact users saw on
             shorter screens with the long signup form. */}
         <div className="relative z-10 flex flex-1 justify-center px-4 py-10 sm:px-8">
-          <div className="my-auto w-full max-w-md">{children}</div>
+          <div className="my-auto w-full max-w-md">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </div>
         </div>
 
         <p className="relative z-10 pb-6 text-center text-xs text-slate-400 lg:hidden">

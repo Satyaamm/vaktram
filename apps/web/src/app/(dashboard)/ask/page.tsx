@@ -19,7 +19,12 @@ export default function AskPage() {
   const messagesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    askApi.listThreads().then(setThreads).catch((e) => setError(String(e)));
+    askApi
+      .listThreads()
+      .then(setThreads)
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Failed to load threads"),
+      );
   }, []);
 
   useEffect(() => {

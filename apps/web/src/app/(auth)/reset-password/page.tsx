@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
+import { parseApiError } from "@/lib/api/errors";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function ResetPasswordPage() {
@@ -59,8 +61,14 @@ function ResetPasswordForm() {
         body: JSON.stringify({ token: resetToken, new_password: password }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || "Something went wrong.");
+        const payload = await res.json().catch(() => ({}));
+        const { message } = parseApiError(payload, "Something went wrong.");
+        setError(message);
+        toast({
+          title: "Couldn't reset your password",
+          description: message,
+          variant: "destructive",
+        });
       } else {
         setSuccess(true);
         toast({

@@ -1,15 +1,20 @@
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { parseApiError } from "@/lib/api/errors";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export class ApiError extends Error {
+  /** Optional structured error code from the API ({"error":"..."}). */
+  public code: string | null;
   constructor(
     public status: number,
     public statusText: string,
     message: string,
+    code: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
+    this.code = code;
   }
 }
 
@@ -119,13 +124,16 @@ async function apiClient<T>(
 
   if (!response.ok) {
     let message = response.statusText;
+    let code: string | null = null;
     try {
       const errorBody = await response.json();
-      message = errorBody.detail || errorBody.message || message;
+      const parsed = parseApiError(errorBody, response.statusText);
+      message = parsed.message;
+      code = parsed.code;
     } catch {
       // keep statusText
     }
-    throw new ApiError(response.status, response.statusText, message);
+    throw new ApiError(response.status, response.statusText, message, code);
   }
 
   if (response.status === 204) return undefined as T;
@@ -165,13 +173,16 @@ async function apiFormData<T>(
 
   if (!response.ok) {
     let message = response.statusText;
+    let code: string | null = null;
     try {
       const errorBody = await response.json();
-      message = errorBody.detail || errorBody.message || message;
+      const parsed = parseApiError(errorBody, response.statusText);
+      message = parsed.message;
+      code = parsed.code;
     } catch {
       // keep statusText
     }
-    throw new ApiError(response.status, response.statusText, message);
+    throw new ApiError(response.status, response.statusText, message, code);
   }
 
   if (response.status === 204) return undefined as T;

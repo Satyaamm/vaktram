@@ -1,5 +1,6 @@
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 // Wraps every public marketing page (/, /product, /pricing, /customers,
 // /security, /about, /contact, /privacy, /terms) with the same nav +
@@ -14,7 +15,7 @@ export default function MarketingLayout({
   return (
     <>
       <SiteNav />
-      {children}
+      <ErrorBoundary>{children}</ErrorBoundary>
       <SiteFooter />
     </>
   );

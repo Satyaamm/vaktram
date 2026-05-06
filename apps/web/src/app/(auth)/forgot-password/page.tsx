@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 
+import { parseApiError } from "@/lib/api/errors";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function ForgotPasswordPage() {
@@ -29,8 +31,9 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: email.trim() }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || "Something went wrong.");
+        const payload = await res.json().catch(() => ({}));
+        const { message } = parseApiError(payload, "Something went wrong.");
+        setError(message);
       } else {
         setSent(true);
       }

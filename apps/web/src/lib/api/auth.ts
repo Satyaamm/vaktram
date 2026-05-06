@@ -35,15 +35,11 @@ export interface SignupResult {
   message: string;
 }
 
-function extractError(payload: unknown): { code: string | null; message: string } {
-  const detail = (payload as { detail?: unknown })?.detail;
-  if (typeof detail === "string") return { code: null, message: detail };
-  if (detail && typeof detail === "object") {
-    const d = detail as { error?: string; message?: string };
-    return { code: d.error ?? null, message: d.message ?? "Request failed" };
-  }
-  return { code: null, message: "Request failed" };
-}
+// Shared error parser handles FastAPI's three detail shapes (string,
+// validation list, structured object) without crashing React on render.
+import { parseApiError } from "./errors";
+
+const extractError = (payload: unknown) => parseApiError(payload, "Request failed");
 
 export class AuthError extends Error {
   constructor(public status: number, public code: string | null, message: string) {

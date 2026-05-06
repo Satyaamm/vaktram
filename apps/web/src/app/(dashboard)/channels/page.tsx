@@ -16,7 +16,13 @@ export default function ChannelsPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = () => channelsApi.list().then(setChannels).catch((e) => setError(String(e)));
+  const refresh = () =>
+    channelsApi
+      .list()
+      .then(setChannels)
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Failed to load channels"),
+      );
 
   useEffect(() => {
     refresh();
