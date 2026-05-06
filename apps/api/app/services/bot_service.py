@@ -24,9 +24,41 @@ def _bot_auth_headers() -> dict[str, str]:
         # a network problem).
         raise HTTPException(
             status_code=503,
-            detail="BOT_SHARED_SECRET is not configured on the API",
+            detail={
+                "error": "missing_bot_secret",
+                "message": "BOT_SHARED_SECRET is not configured on the API",
+            },
         )
     return {"X-Bot-Auth": settings.bot_shared_secret}
+
+
+def _summarise_bot_error(resp: "httpx.Response") -> str:
+    """Turn an unexpected bot-service response into a short, human-friendly
+    sentence. Without this, an HTML error page (e.g. an offline ngrok
+    tunnel returning ~5 KB of HTML) would land in the API's `detail`
+    field and crash the dashboard's toast renderer with a wall of markup.
+
+    Recognises common operator mistakes and points at the fix instead of
+    surfacing the raw upstream body."""
+    body = (resp.text or "").strip()
+    looks_html = body.startswith("<!DOCTYPE") or body.startswith("<html")
+    if "ngrok" in body and "offline" in body.lower():
+        return (
+            "BOT_SERVICE_URL points at an ngrok tunnel that is offline. "
+            "Update Render's BOT_SERVICE_URL to the live bot host."
+        )
+    if looks_html:
+        return (
+            f"Bot host returned HTML ({resp.status_code}) — likely a proxy "
+            "or load-balancer error page. Check BOT_SERVICE_URL on Render."
+        )
+    if resp.status_code == 401:
+        return (
+            "Bot rejected the request (401). BOT_SHARED_SECRET on Render "
+            "and the bot host don't match — rotate both to the same value."
+        )
+    # JSON-ish body — keep the first useful chunk only
+    return f"Bot host responded {resp.status_code}: {body[:200]}"
 
 
 class BotService:
@@ -94,13 +126,20 @@ class BotService:
                 else:
                     raise HTTPException(
                         status_code=502,
-                        detail=f"Bot service error: {resp.text}",
+                        detail={
+                            "error": "bot_service_error",
+                            "message": _summarise_bot_error(resp),
+                            "upstream_status": resp.status_code,
+                        },
                     )
 
         except httpx.ConnectError:
             raise HTTPException(
                 status_code=503,
-                detail="Bot service is not reachable. Make sure it's running.",
+                detail={
+                    "error": "bot_service_unreachable",
+                    "message": "Bot service is not reachable. Make sure it's running.",
+                },
             )
 
     async def leave_meeting(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> dict[str, Any]:
