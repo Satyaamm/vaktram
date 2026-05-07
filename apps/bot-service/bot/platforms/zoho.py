@@ -131,9 +131,17 @@ class ZohoBot(BaseMeetingBot):
         logger.info("[%s] Joining Zoho Meeting: %s", self.meeting_id, self.meeting_url)
         try:
             self._playwright = await async_playwright().start()
+            # If a logged-in Zoho storage_state file is mounted into the
+            # container, reuse it so the join lands on an authenticated
+            # session (no guest CAPTCHA). Default path is the deploy
+            # script's mount target; a missing file is a no-op fallback.
+            storage_state_path = os.getenv(
+                "ZOHO_STORAGE_STATE_PATH", "/app/state/zoho_state.json"
+            )
             self._browser, self._context = await create_browser_context(
                 self._playwright,
                 headless=os.getenv("HEADLESS", "true").lower() == "true",
+                storage_state_path=storage_state_path,
             )
             self._page = await self._context.new_page()
             await self._page.goto(

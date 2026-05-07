@@ -126,6 +126,7 @@ BOT_END_CHECK_INTERVAL_SEC=10
 REGION=ap-southeast-1
 BOT_SERVICE_PORT=1003
 BOT_SHARED_SECRET=$BOT_AUTH_SECRET
+ZOHO_STORAGE_STATE_PATH=/app/state/zoho_state.json
 ENVEOF
 echo "[VPS] .env written (mode 0600)."
 
@@ -173,12 +174,26 @@ docker build --no-cache --pull \
     .
 
 # 10. Run
+# Optional Zoho storage_state mount: if /root/zoho_state.json exists on
+# the host (operator pre-authenticated and SCP'd it), bind it read-only
+# into the container so the Zoho bot reuses a logged-in session and skips
+# the guest-page CAPTCHA. Missing file → no mount → guest fallback.
+ZOHO_STATE_HOST=/root/zoho_state.json
+ZOHO_MOUNT=()
+if [ -f "$ZOHO_STATE_HOST" ]; then
+    echo "[VPS] Mounting Zoho storage_state from $ZOHO_STATE_HOST"
+    ZOHO_MOUNT=(-v "$ZOHO_STATE_HOST:/app/state/zoho_state.json:ro")
+else
+    echo "[VPS] No Zoho storage_state at $ZOHO_STATE_HOST — Zoho joins will use guest flow (CAPTCHA expected)"
+fi
+
 echo "[VPS] Starting container '$BOT_CONTAINER_NAME'..."
 docker run -d \
     --name "$BOT_CONTAINER_NAME" \
     --restart unless-stopped \
     -p 1003:1003 \
     --env-file apps/bot-service/.env \
+    "${ZOHO_MOUNT[@]}" \
     "$BOT_IMAGE_NAME" >/dev/null
 
 # 11. Wait for /health
